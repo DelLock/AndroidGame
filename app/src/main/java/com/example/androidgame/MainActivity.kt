@@ -76,8 +76,8 @@ class Healer(name: String) : Character(name, "Лекарь", 80, 5, 2) {
 }
 
 fun main() {
-    val squad1 = listOf(Warrior("Алекс"), Mage("Мерлин"), Healer("Светлана"))
-    val squad2 = listOf(Warrior("Брут"), Mage("Гулдан"), Healer("Медик"))
+    val squad1 = listOf(Warrior("Алекс"), Mage("Поттер"), Healer("Светлана"))
+    val squad2 = listOf(Warrior("Брут"), Mage("Глория"), Healer("Медик"))
 
     println("НАЧАЛО БОЯ")
     var round = 1
