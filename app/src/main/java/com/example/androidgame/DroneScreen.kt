@@ -1,4 +1,4 @@
-package com.example.androidgame // Убедитесь, что пакет совпадает с вашим
+package com.example.androidgame
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
