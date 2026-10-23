@@ -10,35 +10,73 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+data class Drone(
+    val battery: Int = 100,
+    val cargo: Int = 0,
+    val temperature: Int = 20
+) {
+    val status: Status
+        get() = when {
+            temperature >= 80 -> Status.OVERHEATED
+            battery <= 10 -> Status.DEPLETED
+            cargo >= 100 -> Status.FULL_CARGO
+            else -> Status.NORMAL
+        }
 
-enum class DroneState { NORMAL, OVERHEATED, DEPLETED, FULL_CARGO }
+    enum class Status { NORMAL, OVERHEATED, DEPLETED, FULL_CARGO }
+}
 
 @Composable
-fun DroneScreen() {
-    var battery by remember { mutableIntStateOf(100) }
-    var cargo by remember { mutableIntStateOf(0) }
-    var temperature by remember { mutableIntStateOf(20) }
+fun DroneScreenRoot() {
+    var drone by remember { mutableStateOf(Drone()) }
 
-    val currentState = when {
-        temperature >= 80 -> DroneState.OVERHEATED
-        battery <= 10 -> DroneState.DEPLETED
-        cargo >= 100 -> DroneState.FULL_CARGO
-        else -> DroneState.NORMAL
-    }
+    DroneScreen(
+        drone = drone,
+        onCollectData = {
+            drone = drone.copy(
+                cargo = (drone.cargo + 25).coerceAtMost(100),
+                battery = (drone.battery - 15).coerceAtLeast(0),
+                temperature = (drone.temperature + 30).coerceAtMost(100)
+            )
+        },
+        onTransmitData = {
+            drone = drone.copy(
+                cargo = 0,
+                battery = (drone.battery - 20).coerceAtLeast(0)
+            )
+        },
+        onHibernate = {
+            drone = drone.copy(
+                battery = 100,
+                temperature = 20
+            )
+        },
+        onReset = {
+            drone = Drone()
+        }
+    )
+}
 
-    val canCollectData = currentState != DroneState.OVERHEATED &&
-            currentState != DroneState.DEPLETED &&
-            cargo < 100
+@Composable
+fun DroneScreen(
+    drone: Drone,
+    onCollectData: () -> Unit,
+    onTransmitData: () -> Unit,
+    onHibernate: () -> Unit,
+    onReset: () -> Unit
+) {
+    val canCollectData = drone.status != Drone.Status.OVERHEATED &&
+            drone.status != Drone.Status.DEPLETED &&
+            drone.cargo < 100
 
-    val canTransmitData = cargo > 0 && battery > 20
+    val canTransmitData = drone.cargo > 0 && drone.battery > 20
+    val canHibernate = drone.battery < 100 || drone.temperature > 20
 
-    val canHibernate = battery < 100 || temperature > 20
-
-    val (cardColor, statusText) = when (currentState) {
-        DroneState.NORMAL -> MaterialTheme.colorScheme.surfaceVariant to "Системы в норме"
-        DroneState.OVERHEATED -> Color(0xFFFFCDD2) to "КРИТИЧЕСКИЙ ПЕРЕГРЕВ"
-        DroneState.DEPLETED -> Color(0xFFFFF9C4) to "НИЗКИЙ ЗАРЯД"
-        DroneState.FULL_CARGO -> Color(0xFFC8E6C9) to "ХРАНИЛИЩЕ ПЕРЕПОЛНЕНО"
+    val (cardColor, statusText) = when (drone.status) {
+        Drone.Status.NORMAL -> MaterialTheme.colorScheme.surfaceVariant to "Системы в норме"
+        Drone.Status.OVERHEATED -> Color(0xFFFFCDD2) to "КРИТИЧЕСКИЙ ПЕРЕГРЕВ"
+        Drone.Status.DEPLETED -> Color(0xFFFFF9C4) to "НИЗКИЙ ЗАРЯД"
+        Drone.Status.FULL_CARGO -> Color(0xFFC8E6C9) to "ХРАНИЛИЩЕ ПЕРЕПОЛНЕНО"
     }
 
     Column(
@@ -66,9 +104,9 @@ fun DroneScreen() {
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                if (currentState == DroneState.OVERHEATED) {
+                if (drone.status == Drone.Status.OVERHEATED) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Осторожно!", fontSize = 20.sp)
+                        Text("⚠️", fontSize = 20.sp)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(statusText, color = Color.Red, fontWeight = FontWeight.Bold)
                     }
@@ -78,21 +116,21 @@ fun DroneScreen() {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Метрики
-                MetricBar("Заряд батареи", battery, "%", Color.Blue)
-                MetricBar("Заполненность памяти", cargo, "%", Color.DarkGray)
-                MetricBar("Температура ядра", temperature, "°C", if (temperature >= 80) Color.Red else Color.Unspecified)
+                MetricBar("Заряд батареи", drone.battery, "%", Color.Blue)
+                MetricBar("Заполненность памяти", drone.cargo, "%", Color.DarkGray)
+                MetricBar(
+                    "Температура ядра",
+                    drone.temperature,
+                    "°C",
+                    if (drone.temperature >= 80) Color.Red else Color.Unspecified
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
 
         Button(
-            onClick = {
-                cargo = (cargo + 25).coerceAtMost(100)
-                battery = (battery - 15).coerceAtLeast(0)
-                temperature = (temperature + 30).coerceAtMost(100)
-            },
+            onClick = onCollectData,
             enabled = canCollectData,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -102,10 +140,7 @@ fun DroneScreen() {
         Spacer(modifier = Modifier.height(8.dp))
 
         Button(
-            onClick = {
-                cargo = 0
-                battery = (battery - 20).coerceAtLeast(0)
-            },
+            onClick = onTransmitData,
             enabled = canTransmitData,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -115,10 +150,7 @@ fun DroneScreen() {
         Spacer(modifier = Modifier.height(8.dp))
 
         Button(
-            onClick = {
-                battery = 100
-                temperature = 20
-            },
+            onClick = onHibernate,
             enabled = canHibernate,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -128,11 +160,7 @@ fun DroneScreen() {
         Spacer(modifier = Modifier.height(24.dp))
 
         OutlinedButton(
-            onClick = {
-                battery = 100
-                cargo = 0
-                temperature = 20
-            },
+            onClick = onReset,
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)
         ) {
