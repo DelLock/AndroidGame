@@ -10,11 +10,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-data class Drone(
-    val battery: Int = 100,
-    val cargo: Int = 0,
-    val temperature: Int = 20
-) {
+
+class DroneState {
+    var battery by mutableIntStateOf(100)
+        private set
+
+    var cargo by mutableIntStateOf(0)
+        private set
+
+    var temperature by mutableIntStateOf(20)
+        private set
+
     val status: Status
         get() = when {
             temperature >= 80 -> Status.OVERHEATED
@@ -23,64 +29,60 @@ data class Drone(
             else -> Status.NORMAL
         }
 
+    val canCollectData: Boolean
+        get() = status != Status.OVERHEATED && status != Status.DEPLETED && cargo < 100
+
+    val canTransmitData: Boolean
+        get() = cargo > 0 && battery > 20
+
+    val canHibernate: Boolean
+        get() = battery < 100 || temperature > 20
+
+    fun collectData() {
+        cargo = (cargo + 25).coerceAtMost(100)
+        battery = (battery - 15).coerceAtLeast(0)
+        temperature = (temperature + 30).coerceAtMost(100)
+    }
+
+    fun transmitData() {
+        cargo = 0
+        battery = (battery - 20).coerceAtLeast(0)
+    }
+
+    fun hibernate() {
+        battery = 100
+        temperature = 20
+    }
+
+    fun reset() {
+        battery = 100
+        cargo = 0
+        temperature = 20
+    }
+
     enum class Status { NORMAL, OVERHEATED, DEPLETED, FULL_CARGO }
 }
 
 @Composable
 fun DroneScreenRoot() {
-    var drone by remember { mutableStateOf(Drone()) }
-
-    DroneScreen(
-        drone = drone,
-        onCollectData = {
-            drone = drone.copy(
-                cargo = (drone.cargo + 25).coerceAtMost(100),
-                battery = (drone.battery - 15).coerceAtLeast(0),
-                temperature = (drone.temperature + 30).coerceAtMost(100)
-            )
-        },
-        onTransmitData = {
-            drone = drone.copy(
-                cargo = 0,
-                battery = (drone.battery - 20).coerceAtLeast(0)
-            )
-        },
-        onHibernate = {
-            drone = drone.copy(
-                battery = 100,
-                temperature = 20
-            )
-        },
-        onReset = {
-            drone = Drone()
-        }
-    )
+    val drone = remember { DroneState() }
+    DroneScreen(drone = drone)
 }
 
 @Composable
 fun DroneScreen(
-    drone: Drone,
-    onCollectData: () -> Unit,
-    onTransmitData: () -> Unit,
-    onHibernate: () -> Unit,
-    onReset: () -> Unit
+    drone: DroneState,
+    modifier: Modifier = Modifier
 ) {
-    val canCollectData = drone.status != Drone.Status.OVERHEATED &&
-            drone.status != Drone.Status.DEPLETED &&
-            drone.cargo < 100
-
-    val canTransmitData = drone.cargo > 0 && drone.battery > 20
-    val canHibernate = drone.battery < 100 || drone.temperature > 20
-
     val (cardColor, statusText) = when (drone.status) {
-        Drone.Status.NORMAL -> MaterialTheme.colorScheme.surfaceVariant to "Системы в норме"
-        Drone.Status.OVERHEATED -> Color(0xFFFFCDD2) to "КРИТИЧЕСКИЙ ПЕРЕГРЕВ"
-        Drone.Status.DEPLETED -> Color(0xFFFFF9C4) to "НИЗКИЙ ЗАРЯД"
-        Drone.Status.FULL_CARGO -> Color(0xFFC8E6C9) to "ХРАНИЛИЩЕ ПЕРЕПОЛНЕНО"
+        DroneState.Status.NORMAL -> MaterialTheme.colorScheme.surfaceVariant to "Системы в норме"
+        DroneState.Status.OVERHEATED -> Color(0xFFFFCDD2) to "КРИТИЧЕСКИЙ ПЕРЕГРЕВ"
+        DroneState.Status.DEPLETED -> Color(0xFFFFF9C4) to "НИЗКИЙ ЗАРЯД"
+        DroneState.Status.FULL_CARGO -> Color(0xFFC8E6C9) to "ХРАНИЛИЩЕ ПЕРЕПОЛНЕНО"
     }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -104,7 +106,7 @@ fun DroneScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                if (drone.status == Drone.Status.OVERHEATED) {
+                if (drone.status == DroneState.Status.OVERHEATED) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("⚠️", fontSize = 20.sp)
                         Spacer(modifier = Modifier.width(8.dp))
@@ -130,8 +132,8 @@ fun DroneScreen(
         Spacer(modifier = Modifier.height(32.dp))
 
         Button(
-            onClick = onCollectData,
-            enabled = canCollectData,
+            onClick = { drone.collectData() },
+            enabled = drone.canCollectData,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Собрать данные окружения")
@@ -140,8 +142,8 @@ fun DroneScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         Button(
-            onClick = onTransmitData,
-            enabled = canTransmitData,
+            onClick = { drone.transmitData() },
+            enabled = drone.canTransmitData,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Передать данные на базу")
@@ -150,8 +152,8 @@ fun DroneScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         Button(
-            onClick = onHibernate,
-            enabled = canHibernate,
+            onClick = { drone.hibernate() },
+            enabled = drone.canHibernate,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Гибернация (зарядка и охлаждение)")
@@ -160,7 +162,7 @@ fun DroneScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         OutlinedButton(
-            onClick = onReset,
+            onClick = { drone.reset() },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)
         ) {

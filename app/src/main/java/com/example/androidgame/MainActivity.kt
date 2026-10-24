@@ -18,7 +18,7 @@ class MainActivity : ComponentActivity() {
             AndroidGameTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    color = MaterialTheme.colorScheme.background,
                 ) {
                     DroneScreenRoot()
                 }
