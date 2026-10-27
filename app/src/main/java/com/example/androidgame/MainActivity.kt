@@ -14,13 +14,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val repo = (application as DroneApp).repository
         setContent {
             AndroidGameTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    DroneScreenRoot()
+                    DroneNavigation(repo = repo)
                 }
             }
         }
