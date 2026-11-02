@@ -27,7 +27,25 @@ data class Drone(
     enum class Status { NORMAL, OVERHEATED, DEPLETED, FULL_CARGO }
 }
 
-fun startDrones(): List<Drone> = listOf(
-    Drone(id = 1, name = "Дрон-разведчик X-01", battery = 100, cargo = 0, temperature = 20),
-    Drone(id = 2, name = "Дрон-разведчик X-02", battery = 85, cargo = 25, temperature = 35),
-)
+fun startDrones(): List<Drone> = List(12) { i ->
+    val id = i + 1
+    val initialBattery = when (i % 4) {
+        1 -> 10
+        else -> 100
+    }
+    val initialTemp = when (i % 4) {
+        2 -> 85
+        else -> 20
+    }
+    val initialCargo = when (i % 4) {
+        3 -> 100
+        else -> 0
+    }
+    Drone(
+        id = id,
+        name = "Дрон-разведчик X-%02d".format(id),
+        battery = initialBattery,
+        cargo = initialCargo,
+        temperature = initialTemp,
+    )
+}

@@ -3,6 +3,7 @@ package com.example.androidgame
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -16,8 +17,8 @@ class DroneRepositoryTest {
     }
 
     @Test
-    fun initialDronesCountIsTwo() {
-        assertEquals(2, repo.drones.size)
+    fun initialDronesCountIsAtLeastTen() {
+        assertTrue(repo.drones.size >= 10)
     }
 
     @Test
