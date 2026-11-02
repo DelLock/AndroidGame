@@ -3,7 +3,6 @@ package com.example.androidgame
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -17,8 +16,8 @@ class DroneRepositoryTest {
     }
 
     @Test
-    fun initialDronesCountIsAtLeastTen() {
-        assertTrue(repo.drones.size >= 10)
+    fun initialDronesCountIsTwo() {
+        assertEquals(2, repo.drones.size)
     }
 
     @Test
@@ -46,6 +45,18 @@ class DroneRepositoryTest {
     }
 
     @Test
+    fun renameDrone_updatesDroneName() {
+        val targetId = repo.drones.first().id
+        val newName = "Флагман X-99"
+
+        repo.renameDrone(targetId, newName)
+
+        val updated = repo.drone(targetId)
+        assertNotNull(updated)
+        assertEquals(newName, updated!!.name)
+    }
+
+    @Test
     fun collectData_modifiesOnlyTargetDrone() {
         repo.addDrone()
         val target = repo.drones.last()
@@ -59,10 +70,28 @@ class DroneRepositoryTest {
         assertNotNull(targetAfter)
         assertEquals(25, targetAfter!!.cargo)
         assertEquals(85, targetAfter.battery)
-        assertEquals(50, targetAfter.temperature)
+        assertEquals(35, targetAfter.temperature)
 
         val otherDroneAfter = repo.drone(otherDroneBefore.id)
         assertEquals(otherDroneBefore, otherDroneAfter)
+    }
+
+    @Test
+    fun reachDepletedState_throughNormalOperations() {
+        repo.addDrone()
+        val targetId = repo.drones.last().id
+
+        repo.collectData(targetId)
+        repo.collectData(targetId)
+        repo.transmitData(targetId)
+        repo.collectData(targetId)
+        repo.transmitData(targetId)
+        repo.collectData(targetId)
+
+        val drone = repo.drone(targetId)
+        assertNotNull(drone)
+        assertEquals(10, drone!!.battery)
+        assertEquals(Drone.Status.DEPLETED, drone.status)
     }
 
     @Test

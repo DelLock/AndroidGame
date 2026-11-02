@@ -18,7 +18,7 @@ class DroneRepository {
             name = "Дрон-разведчик X-%02d".format(nextId),
             battery = 100,
             cargo = 0,
-            temperature = 20
+            temperature = 20,
         )
         nextId++
         drones += newDrone
@@ -29,13 +29,20 @@ class DroneRepository {
         drones -= target
     }
 
+    fun renameDrone(id: Int, newName: String) {
+        val current = drone(id) ?: return
+        if (newName.isBlank()) return
+        val updated = current.copy(name = newName.trim())
+        updateDrone(updated)
+    }
+
     fun collectData(id: Int) {
         val current = drone(id) ?: return
         if (!current.canCollectData) return
         val updated = current.copy(
             cargo = (current.cargo + 25).coerceAtMost(100),
             battery = (current.battery - 15).coerceAtLeast(0),
-            temperature = (current.temperature + 30).coerceAtMost(100)
+            temperature = (current.temperature + 15).coerceAtMost(100),
         )
         updateDrone(updated)
     }
@@ -45,7 +52,8 @@ class DroneRepository {
         if (!current.canTransmitData) return
         val updated = current.copy(
             cargo = 0,
-            battery = (current.battery - 20).coerceAtLeast(0)
+            battery = (current.battery - 15).coerceAtLeast(0),
+            temperature = (current.temperature - 20).coerceAtLeast(20),
         )
         updateDrone(updated)
     }
@@ -55,7 +63,7 @@ class DroneRepository {
         if (!current.canHibernate) return
         val updated = current.copy(
             battery = 100,
-            temperature = 20
+            temperature = 20,
         )
         updateDrone(updated)
     }
@@ -65,7 +73,7 @@ class DroneRepository {
         val updated = current.copy(
             battery = 100,
             cargo = 0,
-            temperature = 20
+            temperature = 20,
         )
         updateDrone(updated)
     }

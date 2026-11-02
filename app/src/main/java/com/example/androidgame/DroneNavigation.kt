@@ -39,7 +39,7 @@ fun DroneNavigation(repo: DroneRepository, modifier: Modifier = Modifier) {
                         if (backStack.lastOrNull() == DroneListKey) {
                             backStack.add(DroneDetailKey(id))
                         }
-                    }
+                    },
                 )
             }
             entry<DroneDetailKey> { key ->
@@ -51,6 +51,7 @@ fun DroneNavigation(repo: DroneRepository, modifier: Modifier = Modifier) {
                 }
                 DroneDetailScreen(
                     state = viewModel.uiState,
+                    onRename = viewModel::onRename,
                     onCollectData = viewModel::onCollectData,
                     onTransmitData = viewModel::onTransmitData,
                     onHibernate = viewModel::onHibernate,
@@ -59,9 +60,9 @@ fun DroneNavigation(repo: DroneRepository, modifier: Modifier = Modifier) {
                         viewModel.onDelete()
                         close()
                     },
-                    onBack = close
+                    onBack = close,
                 )
             }
-        }
+        },
     )
 }
