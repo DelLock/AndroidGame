@@ -12,8 +12,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 
 /**
- * Векторная отрисовка дрона через Canvas.
- * Визуальные отличия:
+ * Векторная отрисовка дронов внутри приложения через Canvas.
  * - OVERHEATED: асимметричный неровный клубящийся дым над раскаленным корпусом.
  * - FULL_CARGO: зеленый округленный (шарообразный) корпус без сторонних фоновых фигур.
  * - DEPLETED: спит — над дроном поднимаются синие буквы Z.
@@ -22,7 +21,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 @Composable
 fun DroneImage(
     status: Drone.Status,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val statusColor = when (status) {
         Drone.Status.NORMAL -> Color(0xFF1976D2)
@@ -38,28 +37,28 @@ fun DroneImage(
             val cx = w / 2f
             val cy = h / 2f
 
-            // 1. НЕРОВНЫЙ АСИММЕТРИЧНЫЙ ДЫМ ПРИ ПЕРЕГРЕВЕ (OVERHEATED)
+            // 1. Дым при критическом перегреве
             if (status == Drone.Status.OVERHEATED) {
-                drawCircle(color = Color(0x559E9E9E), radius = w * 0.11f, center = Offset(cx - w * 0.08f, cy - h * 0.28f))
-                drawCircle(color = Color(0x66B0BEC5), radius = w * 0.15f, center = Offset(cx + w * 0.05f, cy - h * 0.33f))
-                drawCircle(color = Color(0x44CFD8DC), radius = w * 0.18f, center = Offset(cx - w * 0.14f, cy - h * 0.38f))
-                drawCircle(color = Color(0x5590A4AE), radius = w * 0.13f, center = Offset(cx + w * 0.12f, cy - h * 0.42f))
-                drawCircle(color = Color(0x33ECEFF1), radius = w * 0.22f, center = Offset(cx - w * 0.02f, cy - h * 0.48f))
+                drawCircle(color = Color(0x559E9E9E), radius = w * 0.11f, center = Offset(cx - (w * 0.08f), cy - (h * 0.28f)))
+                drawCircle(color = Color(0x66B0BEC5), radius = w * 0.15f, center = Offset(cx + (w * 0.05f), cy - (h * 0.33f)))
+                drawCircle(color = Color(0x44CFD8DC), radius = w * 0.18f, center = Offset(cx - (w * 0.14f), cy - (h * 0.38f)))
+                drawCircle(color = Color(0x5590A4AE), radius = w * 0.13f, center = Offset(cx + (w * 0.12f), cy - (h * 0.42f)))
+                drawCircle(color = Color(0x33ECEFF1), radius = w * 0.22f, center = Offset(cx - (w * 0.02f), cy - (h * 0.48f)))
             }
 
-            // 2. СИНИЕ БУКВЫ "Z" ПРИ НИЗКОМ ЗАРЯДЕ / СПЯЩЕМ РЕЖИМЕ (DEPLETED)
+            // 2. Синие буквы Z при низком заряде (спящий режим)
             if (status == Drone.Status.DEPLETED) {
                 drawZ(
                     color = Color(0xFF03A9F4),
                     topLeft = Offset(cx + w * 0.10f, cy - h * 0.35f),
                     zSize = w * 0.10f,
-                    strokeWidth = w * 0.035f
+                    strokeWidth = w * 0.035f,
                 )
                 drawZ(
                     color = Color(0xFF4FC3F7),
                     topLeft = Offset(cx + w * 0.22f, cy - h * 0.50f),
                     zSize = w * 0.15f,
-                    strokeWidth = w * 0.045f
+                    strokeWidth = w * 0.045f,
                 )
             }
 
@@ -74,13 +73,13 @@ fun DroneImage(
                 color = armColor,
                 start = Offset(cx - armLength, cy - armLength),
                 end = Offset(cx + armLength, cy + armLength),
-                strokeWidth = strokeWidth
+                strokeWidth = strokeWidth,
             )
             drawLine(
                 color = armColor,
                 start = Offset(cx + armLength, cy - armLength),
                 end = Offset(cx - armLength, cy + armLength),
-                strokeWidth = strokeWidth
+                strokeWidth = strokeWidth,
             )
 
             // 4. Пропеллеры / Моторы
@@ -88,7 +87,7 @@ fun DroneImage(
                 Offset(cx - armLength, cy - armLength),
                 Offset(cx + armLength, cy - armLength),
                 Offset(cx - armLength, cy + armLength),
-                Offset(cx + armLength, cy + armLength)
+                Offset(cx + armLength, cy + armLength),
             )
 
             for (center in rotorCenters) {
@@ -96,18 +95,17 @@ fun DroneImage(
                     color = Color(0xFF263238),
                     radius = rotorRadius,
                     center = center,
-                    style = Stroke(width = w * 0.025f)
+                    style = Stroke(width = w * 0.025f),
                 )
                 drawLine(
                     color = if (status == Drone.Status.DEPLETED) Color(0xFF607D8B) else Color(0xFF90A4AE),
                     start = Offset(center.x - rotorRadius * 0.85f, center.y),
                     end = Offset(center.x + rotorRadius * 0.85f, center.y),
-                    strokeWidth = w * 0.03f
+                    strokeWidth = w * 0.03f,
                 )
             }
 
             // 5. Корпус дрона
-            // ПРИ FULL_CARGO: корпус просто становится зелёным и полностью округлённым
             val isFullCargo = status == Drone.Status.FULL_CARGO
             val bodySize = if (isFullCargo) w * 0.44f else w * 0.38f
             val cornerPercent = if (isFullCargo) 0.5f else 0.08f
@@ -123,10 +121,10 @@ fun DroneImage(
                 color = bodyColor,
                 topLeft = Offset(cx - bodySize / 2f, cy - bodySize / 2f),
                 size = Size(bodySize, bodySize),
-                cornerRadius = CornerRadius(bodySize * cornerPercent, bodySize * cornerPercent)
+                cornerRadius = CornerRadius(bodySize * cornerPercent, bodySize * cornerPercent),
             )
 
-            // Металлическая окантовка корпуса
+            // Окантовка корпуса
             val rimColor = when (status) {
                 Drone.Status.OVERHEATED -> Color(0xFFFF5722)
                 Drone.Status.FULL_CARGO -> Color(0xFF81C784)
@@ -138,7 +136,7 @@ fun DroneImage(
                 topLeft = Offset(cx - bodySize / 2f, cy - bodySize / 2f),
                 size = Size(bodySize, bodySize),
                 cornerRadius = CornerRadius(bodySize * cornerPercent, bodySize * cornerPercent),
-                style = Stroke(width = w * 0.025f)
+                style = Stroke(width = w * 0.025f),
             )
 
             // 6. Оптический сенсор / Объектив камеры
@@ -153,27 +151,24 @@ fun DroneImage(
             drawCircle(
                 color = Color(0xFF000000),
                 radius = lensRadius,
-                center = Offset(cx, cy)
+                center = Offset(cx, cy),
             )
             drawCircle(
                 color = lensGlow,
                 radius = lensRadius * 0.5f,
-                center = Offset(cx, cy)
+                center = Offset(cx, cy),
             )
 
             // 7. Светодиодный индикатор статуса систем
             drawCircle(
                 color = statusColor,
                 radius = w * 0.045f,
-                center = Offset(cx, cy - bodySize * 0.35f)
+                center = Offset(cx, cy - bodySize * 0.35f),
             )
         }
     }
 }
 
-/**
- * Векторное рисование буквы "Z" для спящего дрона
- */
 private fun DrawScope.drawZ(color: Color, topLeft: Offset, zSize: Float, strokeWidth: Float) {
     drawLine(color, start = topLeft, end = Offset(topLeft.x + zSize, topLeft.y), strokeWidth = strokeWidth)
     drawLine(color, start = Offset(topLeft.x + zSize, topLeft.y), end = Offset(topLeft.x, topLeft.y + zSize), strokeWidth = strokeWidth)
@@ -182,12 +177,11 @@ private fun DrawScope.drawZ(color: Color, topLeft: Offset, zSize: Float, strokeW
 
 /**
  * Холдеры графика/иконок состояний (перегрев, разрядка, переполнение, норма)
- * Нарисованы векторно через Canvas без использования эмодзи.
  */
 @Composable
 fun StatusImage(
     status: Drone.Status,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier) {
         Canvas(modifier = Modifier.matchParentSize()) {
@@ -210,7 +204,7 @@ fun StatusImage(
                         color = red,
                         topLeft = Offset(cx - stemWidth / 2f, cy - h * 0.25f),
                         size = Size(stemWidth, stemHeight),
-                        cornerRadius = CornerRadius(stemWidth / 2f, stemWidth / 2f)
+                        cornerRadius = CornerRadius(stemWidth / 2f, stemWidth / 2f),
                     )
                 }
 
@@ -228,17 +222,17 @@ fun StatusImage(
                         topLeft = Offset(bx, by),
                         size = Size(bw, bh),
                         cornerRadius = CornerRadius(w * 0.04f, w * 0.04f),
-                        style = Stroke(width = w * 0.05f)
+                        style = Stroke(width = w * 0.05f),
                     )
                     drawRect(
                         color = orange,
                         topLeft = Offset(cx + bw / 2f, cy - bh * 0.22f),
-                        size = Size(w * 0.05f, bh * 0.44f)
+                        size = Size(w * 0.05f, bh * 0.44f),
                     )
                     drawRect(
                         color = orange,
                         topLeft = Offset(bx + w * 0.05f, by + h * 0.04f),
-                        size = Size(bw * 0.25f, bh - h * 0.08f)
+                        size = Size(bw * 0.25f, bh - h * 0.08f),
                     )
                 }
 
@@ -255,7 +249,7 @@ fun StatusImage(
                         color = green,
                         topLeft = Offset(dx, dy),
                         size = Size(dw, dh),
-                        cornerRadius = CornerRadius(w * 0.05f, w * 0.05f)
+                        cornerRadius = CornerRadius(w * 0.05f, w * 0.05f),
                     )
                     drawLine(color = Color.White, start = Offset(dx + dw * 0.2f, dy + dh * 0.3f), end = Offset(dx + dw * 0.8f, dy + dh * 0.3f), strokeWidth = w * 0.04f)
                     drawLine(color = Color.White, start = Offset(dx + dw * 0.2f, dy + dh * 0.6f), end = Offset(dx + dw * 0.8f, dy + dh * 0.6f), strokeWidth = w * 0.04f)

@@ -3,13 +3,13 @@ package com.example.androidgame
 import androidx.lifecycle.ViewModel
 
 data class DroneListUiState(
-    val drones: List<Drone> = emptyList()
+    val drones: List<Drone> = emptyList(),
 )
 
 class DroneListViewModel(private val repo: DroneRepository) : ViewModel() {
     val uiState: DroneListUiState
         get() = DroneListUiState(drones = repo.drones)
 
-    fun onAddDrone() = repo.addDrone()
+    fun onAddDrone(name: String? = null) = repo.addDrone(name)
     fun onDeleteDrone(id: Int) = repo.deleteDrone(id)
 }
