@@ -54,26 +54,31 @@ fun DroneDetailScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val soundManager = remember { SoundManager() }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Карточка дрона") },
                 navigationIcon = {
                     OutlinedButton(
-                        onClick = onBack,
+                        onClick = {
+                            soundManager.play(SoundManager.Effect.CLICK)
+                            onBack()
+                        },
                         modifier = Modifier.padding(start = 8.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF00E5FF)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Cyan),
                     ) {
                         Text("Назад")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF161B22),
-                    titleContentColor = Color(0xFF00E5FF),
+                    containerColor = DroneColors.Surface,
+                    titleContentColor = DroneColors.Cyan,
                 ),
             )
         },
-        containerColor = Color(0xFF0D1117),
+        containerColor = DroneColors.Background,
         modifier = modifier,
     ) { innerPadding ->
         Column(
@@ -89,6 +94,7 @@ fun DroneDetailScreen(
                 is DroneDetailUiState.Content -> ContentBox(
                     drone = state.drone,
                     telemetry = state.telemetry,
+                    soundManager = soundManager,
                     onRename = onRename,
                     onCollectData = onCollectData,
                     onTransmitData = onTransmitData,
@@ -112,11 +118,11 @@ private fun LoadingBox() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        CircularProgressIndicator(color = Color(0xFF00E5FF))
+        CircularProgressIndicator(color = DroneColors.Cyan)
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = "Установка сетевого соединения с дроном...",
-            color = Color(0xFF00E5FF),
+            color = DroneColors.Cyan,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
         )
@@ -127,6 +133,7 @@ private fun LoadingBox() {
 private fun ContentBox(
     drone: Drone,
     telemetry: DroneTelemetryDto,
+    soundManager: SoundManager,
     onRename: (String) -> Unit,
     onCollectData: () -> Unit,
     onTransmitData: () -> Unit,
@@ -134,19 +141,16 @@ private fun ContentBox(
     onReset: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val (cardColor, statusText, statusColor) = when (drone.status) {
-        Drone.Status.NORMAL -> Triple(Color(0xFF161B22), "Системы в норме", Color(0xFF00E5FF))
-        Drone.Status.OVERHEATED -> Triple(Color(0xFF2D1214), "КРИТИЧЕСКИЙ ПЕРЕГРЕВ", Color(0xFFFF1744))
-        Drone.Status.DEPLETED -> Triple(Color(0xFF2D2012), "НИЗКИЙ ЗАРЯД", Color(0xFFFF9100))
-        Drone.Status.FULL_CARGO -> Triple(Color(0xFF122D1A), "ХРАНИЛИЩЕ ПЕРЕПОЛНЕНО", Color(0xFF00E676))
-    }
+    val style = drone.status.style()
+    val base = baseFor(drone.id)
+    val weatherDesc = weatherDescription(telemetry.weather.weatherCode)
 
     var isEditingName by remember { mutableStateOf(value = false) }
     var nameInput by remember(drone.name) { mutableStateOf(drone.name) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = cardColor),
+        colors = CardDefaults.cardColors(containerColor = style.cardColor),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
     ) {
@@ -172,14 +176,15 @@ private fun ContentBox(
                         onValueChange = { nameInput = it },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
-                        label = { Text("Имя дрона", color = Color(0xFF00E5FF)) },
+                        label = { Text("Имя дрона", color = DroneColors.Cyan) },
                     )
                     Button(
                         onClick = {
+                            soundManager.play(SoundManager.Effect.CLICK)
                             onRename(nameInput)
                             isEditingName = false
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF), contentColor = Color.Black),
+                        colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
                     ) {
                         Text("ОК", fontWeight = FontWeight.Bold)
                     }
@@ -197,9 +202,12 @@ private fun ContentBox(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     OutlinedButton(
-                        onClick = { isEditingName = true },
+                        onClick = {
+                            soundManager.play(SoundManager.Effect.CLICK)
+                            isEditingName = true
+                        },
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF00E5FF)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Cyan),
                     ) {
                         Text("Переименовать", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     }
@@ -216,42 +224,44 @@ private fun ContentBox(
                         .padding(end = 6.dp),
                 )
                 Text(
-                    text = statusText,
+                    text = style.text,
                     fontWeight = FontWeight.Bold,
-                    color = statusColor,
+                    color = style.accent,
                     fontSize = 15.sp,
                 )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            DetailMetricBar("Заряд батареи", drone.battery, "%", Color(0xFF00E5FF))
-            DetailMetricBar("Заполненность памяти", drone.cargo, "%", Color(0xFFFF007F))
+            DetailMetricBar("Заряд батареи", drone.battery, "%", DroneColors.Cyan)
+            DetailMetricBar("Заполненность памяти", drone.cargo, "%", DroneColors.Pink)
             DetailMetricBar(
                 "Температура ядра",
                 drone.temperature,
                 "°C",
-                if (drone.temperature >= 80) Color(0xFFFF1744) else Color(0xFF00E676),
+                if (drone.temperature >= 80) DroneColors.Danger else DroneColors.Good,
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF21262D)),
+                colors = CardDefaults.cardColors(containerColor = DroneColors.SurfaceAlt),
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
-                        text = "Сетевая телеметрия (API):",
+                        text = "Сетевая телеметрия и база:",
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF00E5FF),
+                        color = DroneColors.Cyan,
                         fontSize = 13.sp,
                     )
+                    Text("База: ${base.city} (${base.latitude}, ${base.longitude})", color = Color.White, fontSize = 12.sp)
+                    Text("Погода: $weatherDesc, ветер ${telemetry.weather.windSpeed} м/с", color = Color.White, fontSize = 12.sp)
                     Text("Модель: ${telemetry.model}", color = Color.White, fontSize = 12.sp)
                     Text("Прошивка: ${telemetry.firmware}", color = Color.White, fontSize = 12.sp)
                     Text("Дальность: ${telemetry.rangeKm} км", color = Color.White, fontSize = 12.sp)
                     Text("Сенсоры: ${telemetry.sensorType}", color = Color.White, fontSize = 12.sp)
-                    Text(telemetry.notes, color = Color(0xFF8B949E), fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                    Text(telemetry.notes, color = DroneColors.Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
                 }
             }
         }
@@ -260,10 +270,13 @@ private fun ContentBox(
     Spacer(modifier = Modifier.height(20.dp))
 
     Button(
-        onClick = onCollectData,
+        onClick = {
+            soundManager.play(SoundManager.Effect.CLICK)
+            onCollectData()
+        },
         enabled = drone.canCollectData,
         modifier = Modifier.fillMaxWidth(),
-        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF), contentColor = Color.Black),
+        colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
     ) {
         Text("Собрать данные окружения", fontWeight = FontWeight.Bold)
     }
@@ -271,10 +284,13 @@ private fun ContentBox(
     Spacer(modifier = Modifier.height(8.dp))
 
     Button(
-        onClick = onTransmitData,
+        onClick = {
+            soundManager.play(SoundManager.Effect.SUCCESS)
+            onTransmitData()
+        },
         enabled = drone.canTransmitData,
         modifier = Modifier.fillMaxWidth(),
-        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF007F), contentColor = Color.White),
+        colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Pink, contentColor = Color.White),
     ) {
         Text("Передать данные на базу", fontWeight = FontWeight.Bold)
     }
@@ -282,7 +298,10 @@ private fun ContentBox(
     Spacer(modifier = Modifier.height(8.dp))
 
     Button(
-        onClick = onHibernate,
+        onClick = {
+            soundManager.play(SoundManager.Effect.SUCCESS)
+            onHibernate()
+        },
         enabled = drone.canHibernate,
         modifier = Modifier.fillMaxWidth(),
         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3), contentColor = Color.White),
@@ -293,9 +312,12 @@ private fun ContentBox(
     Spacer(modifier = Modifier.height(12.dp))
 
     OutlinedButton(
-        onClick = onReset,
+        onClick = {
+            soundManager.play(SoundManager.Effect.WARNING)
+            onReset()
+        },
         modifier = Modifier.fillMaxWidth(),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF00E5FF)),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Cyan),
     ) {
         Text("Сброс до заводских настроек")
     }
@@ -303,9 +325,12 @@ private fun ContentBox(
     Spacer(modifier = Modifier.height(8.dp))
 
     OutlinedButton(
-        onClick = onDelete,
+        onClick = {
+            soundManager.play(SoundManager.Effect.DELETE)
+            onDelete()
+        },
         modifier = Modifier.fillMaxWidth(),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF1744)),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Danger),
     ) {
         Text("Списать (удалить дрон)")
     }
@@ -321,10 +346,10 @@ private fun NotFoundBox(onBack: () -> Unit) {
             text = "Дрон не найден или списан",
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFFFF1744),
+            color = DroneColors.Danger,
         )
         Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF), contentColor = Color.Black)) {
+        Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black)) {
             Text("Вернуться к списку", fontWeight = FontWeight.Bold)
         }
     }
@@ -339,14 +364,14 @@ private fun ErrorBox(canRetry: Boolean, onRetry: () -> Unit) {
         Text(
             text = if (canRetry) "Не удалось подключиться к каналу связи дрона" else "Ошибка формата ответа сервера",
             style = MaterialTheme.typography.titleMedium,
-            color = Color(0xFFFF1744),
+            color = DroneColors.Danger,
             textAlign = TextAlign.Center,
         )
         Spacer(modifier = Modifier.height(16.dp))
         if (canRetry) {
             Button(
                 onClick = onRetry,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF), contentColor = Color.Black),
+                colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
             ) {
                 Text("Повторить загрузку", fontWeight = FontWeight.Bold)
             }
@@ -369,8 +394,8 @@ fun DetailMetricBar(label: String, value: Int, unit: String, color: Color) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(8.dp),
-            color = if (color == Color.Unspecified) Color(0xFF00E5FF) else color,
-            trackColor = Color(0xFF21262D),
+            color = if (color == Color.Unspecified) DroneColors.Cyan else color,
+            trackColor = DroneColors.SurfaceAlt,
         )
     }
 }

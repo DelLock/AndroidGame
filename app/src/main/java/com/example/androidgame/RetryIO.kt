@@ -14,7 +14,7 @@ suspend fun <T> retryIO(
     repeat(times - 1) {
         try {
             return block()
-        } catch (e: IOException) {
+        } catch (_: IOException) {
         } catch (e: HttpException) {
             if (e.code() < 500) throw e
         }

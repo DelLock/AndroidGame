@@ -50,13 +50,13 @@ fun DroneImage(
             if (status == Drone.Status.DEPLETED) {
                 drawZ(
                     color = Color(0xFF03A9F4),
-                    topLeft = Offset(cx + w * 0.10f, cy - h * 0.35f),
+                    topLeft = Offset(cx + (w * 0.10f), cy - (h * 0.35f)),
                     zSize = w * 0.10f,
                     strokeWidth = w * 0.035f,
                 )
                 drawZ(
                     color = Color(0xFF4FC3F7),
-                    topLeft = Offset(cx + w * 0.22f, cy - h * 0.50f),
+                    topLeft = Offset(cx + (w * 0.22f), cy - (h * 0.50f)),
                     zSize = w * 0.15f,
                     strokeWidth = w * 0.045f,
                 )
@@ -99,8 +99,8 @@ fun DroneImage(
                 )
                 drawLine(
                     color = if (status == Drone.Status.DEPLETED) Color(0xFF607D8B) else Color(0xFF90A4AE),
-                    start = Offset(center.x - rotorRadius * 0.85f, center.y),
-                    end = Offset(center.x + rotorRadius * 0.85f, center.y),
+                    start = Offset(center.x - (rotorRadius * 0.85f), center.y),
+                    end = Offset(center.x + (rotorRadius * 0.85f), center.y),
                     strokeWidth = w * 0.03f,
                 )
             }
@@ -119,7 +119,7 @@ fun DroneImage(
 
             drawRoundRect(
                 color = bodyColor,
-                topLeft = Offset(cx - bodySize / 2f, cy - bodySize / 2f),
+                topLeft = Offset(cx - (bodySize / 2f), cy - (bodySize / 2f)),
                 size = Size(bodySize, bodySize),
                 cornerRadius = CornerRadius(bodySize * cornerPercent, bodySize * cornerPercent),
             )
@@ -133,7 +133,7 @@ fun DroneImage(
 
             drawRoundRect(
                 color = rimColor,
-                topLeft = Offset(cx - bodySize / 2f, cy - bodySize / 2f),
+                topLeft = Offset(cx - (bodySize / 2f), cy - (bodySize / 2f)),
                 size = Size(bodySize, bodySize),
                 cornerRadius = CornerRadius(bodySize * cornerPercent, bodySize * cornerPercent),
                 style = Stroke(width = w * 0.025f),
@@ -163,7 +163,7 @@ fun DroneImage(
             drawCircle(
                 color = statusColor,
                 radius = w * 0.045f,
-                center = Offset(cx, cy - bodySize * 0.35f),
+                center = Offset(cx, cy - (bodySize * 0.35f)),
             )
         }
     }
@@ -197,12 +197,12 @@ fun StatusImage(
                     drawCircle(color = red, radius = w * 0.45f, center = Offset(cx, cy), style = Stroke(width = w * 0.06f))
 
                     val bulbRadius = w * 0.16f
-                    drawCircle(color = red, radius = bulbRadius, center = Offset(cx, cy + h * 0.15f))
+                    drawCircle(color = red, radius = bulbRadius, center = Offset(cx, cy + (h * 0.15f)))
                     val stemWidth = w * 0.14f
                     val stemHeight = h * 0.35f
                     drawRoundRect(
                         color = red,
-                        topLeft = Offset(cx - stemWidth / 2f, cy - h * 0.25f),
+                        topLeft = Offset(cx - (stemWidth / 2f), cy - (h * 0.25f)),
                         size = Size(stemWidth, stemHeight),
                         cornerRadius = CornerRadius(stemWidth / 2f, stemWidth / 2f),
                     )

@@ -11,6 +11,7 @@ data class DroneTelemetryDto(
     @SerialName("firmware") val firmware: String = "v3.12.8-cyber",
     @SerialName("range_km") val rangeKm: Int = 120,
     @SerialName("sensor_type") val sensorType: String = "LiDAR / Quantum Optical",
+    val weather: CurrentWeatherDto = CurrentWeatherDto(),
     val notes: String = "Спецификация телеметрии успешно загружена по сети с сервера штаба.",
 )
 

@@ -40,7 +40,8 @@ class DroneDetailViewModel(
     }
 
     fun onCollectData() {
-        repo.collectData(droneId)
+        val isWindy = (uiState as? DroneDetailUiState.Content)?.telemetry?.weather?.isWindy ?: false
+        repo.collectData(droneId, isWindy)
         refreshState()
     }
 
@@ -73,10 +74,10 @@ class DroneDetailViewModel(
         val current = uiState
         if (current is DroneDetailUiState.Content) {
             val updatedDrone = repo.drone(droneId)
-            if (updatedDrone == null) {
-                uiState = DroneDetailUiState.NotFound
+            uiState = if (updatedDrone == null) {
+                DroneDetailUiState.NotFound
             } else {
-                uiState = current.copy(drone = updatedDrone)
+                current.copy(drone = updatedDrone)
             }
         }
     }
@@ -86,7 +87,7 @@ class DroneDetailViewModel(
         return try {
             val telemetry = repo.fetchTelemetry(droneId)
             DroneDetailUiState.Content(drone, telemetry)
-        } catch (e: DroneNotFoundException) {
+        } catch (_: DroneNotFoundException) {
             DroneDetailUiState.NotFound
         } catch (e: DroneNetworkException) {
             DroneDetailUiState.Error(e.canRetry)

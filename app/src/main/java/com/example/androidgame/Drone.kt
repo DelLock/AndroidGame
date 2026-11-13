@@ -1,5 +1,8 @@
 package com.example.androidgame
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class Drone(
     val id: Int,
     val name: String,
@@ -19,10 +22,10 @@ data class Drone(
         get() = (status != Status.OVERHEATED) && (status != Status.DEPLETED) && (cargo < 100)
 
     val canTransmitData: Boolean
-        get() = cargo > 0 && battery > 10
+        get() = (cargo > 0) && (battery > 10)
 
     val canHibernate: Boolean
-        get() = battery < 100 || temperature > 20
+        get() = (battery < 100) || (temperature > 20)
 
     enum class Status { NORMAL, OVERHEATED, DEPLETED, FULL_CARGO }
 }

@@ -1,0 +1,7 @@
+{
+  "model": "X-Scout Mk-IV",
+  "firmware": "v3.12.12-cyber",
+  "range_km": 200,
+  "sensor_type": "LiDAR / Quantum Optical",
+  "notes": "Спецификация дрона №12 успешно загружена с сервера штаба."
+}
