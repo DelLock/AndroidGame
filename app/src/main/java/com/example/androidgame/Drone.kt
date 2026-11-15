@@ -6,32 +6,70 @@ import kotlinx.serialization.Serializable
 data class Drone(
     val id: Int,
     val name: String,
+    val baseCity: String = "Москва",
+    val rankLevel: Int = 1,
     val battery: Int = 100,
+    val maxBattery: Int = 100,
     val cargo: Int = 0,
     val temperature: Int = 20,
+    val heatRate: Int = 15,
+    val missionsCompleted: Int = 0,
+    val activeMissionDuration: Int = 0,
+    val activeMissionRemaining: Int = 0,
 ) {
     val status: Status
         get() = when {
+            activeMissionRemaining > 0 -> Status.ON_MISSION
             temperature >= 80 -> Status.OVERHEATED
             battery <= 10 -> Status.DEPLETED
             cargo >= 100 -> Status.FULL_CARGO
             else -> Status.NORMAL
         }
 
+    val rankName: String
+        get() = when (rankLevel) {
+            1 -> "Новобранец (Ранг 1)"
+            2 -> "Оператор (Ранг 2)"
+            3 -> "Ветеран (Ранг 3)"
+            4 -> "Спецназ (Ранг 4)"
+            else -> "Ас флота (Ранг 5)"
+        }
+
+    val upgradeCost: Int
+        get() = 100 * rankLevel
+
+    val batteryBoostAmount: Int
+        get() = 20 * rankLevel
+
+    val coolingBoostAmount: Int
+        get() = (2 * rankLevel).coerceAtMost(5)
+
+    fun missionLaunchCost(durationSeconds: Int): Int = when (durationSeconds) {
+        60 -> 150 * rankLevel
+        30 -> 60 * rankLevel
+        else -> 20 * rankLevel
+    }
+
     val canCollectData: Boolean
-        get() = (status != Status.OVERHEATED) && (status != Status.DEPLETED) && (cargo < 100)
+        get() = (status != Status.ON_MISSION) && (status != Status.OVERHEATED) && (status != Status.DEPLETED) && (cargo < 100)
 
     val canTransmitData: Boolean
-        get() = (cargo > 0) && (battery > 10)
+        get() = (status != Status.ON_MISSION) && (cargo > 0) && (battery > 10)
 
     val canHibernate: Boolean
-        get() = (battery < 100) || (temperature > 20)
+        get() = (status != Status.ON_MISSION) && ((battery < maxBattery) || (temperature > 20))
 
-    enum class Status { NORMAL, OVERHEATED, DEPLETED, FULL_CARGO }
+    fun canStartMission(durationSeconds: Int, currentCredits: Int): Boolean {
+        val cost = missionLaunchCost(durationSeconds)
+        return (status != Status.ON_MISSION) && (status != Status.OVERHEATED) && (battery >= 30) && (currentCredits >= cost)
+    }
+
+    enum class Status { NORMAL, ON_MISSION, OVERHEATED, DEPLETED, FULL_CARGO }
 }
 
 fun startDrones(): List<Drone> = List(12) { i ->
     val id = i + 1
+    val base = ALL_BASES[i % ALL_BASES.size]
     val initialBattery = when (i % 4) {
         1 -> 10
         else -> 100
@@ -47,6 +85,7 @@ fun startDrones(): List<Drone> = List(12) { i ->
     Drone(
         id = id,
         name = "Дрон-разведчик X-%02d".format(id),
+        baseCity = base.city,
         battery = initialBattery,
         cargo = initialCargo,
         temperature = initialTemp,

@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -46,10 +48,14 @@ fun DroneDetailScreen(
     state: DroneDetailUiState,
     onRetry: () -> Unit,
     onRename: (String) -> Unit,
+    onSetBase: (String) -> Unit,
     onCollectData: () -> Unit,
     onTransmitData: () -> Unit,
     onHibernate: () -> Unit,
     onReset: () -> Unit,
+    onStartMission: (Int) -> Unit,
+    onUpgradeBattery: () -> Unit,
+    onUpgradeCooling: () -> Unit,
     onDelete: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -94,12 +100,17 @@ fun DroneDetailScreen(
                 is DroneDetailUiState.Content -> ContentBox(
                     drone = state.drone,
                     telemetry = state.telemetry,
+                    credits = state.credits,
                     soundManager = soundManager,
                     onRename = onRename,
+                    onSetBase = onSetBase,
                     onCollectData = onCollectData,
                     onTransmitData = onTransmitData,
                     onHibernate = onHibernate,
                     onReset = onReset,
+                    onStartMission = onStartMission,
+                    onUpgradeBattery = onUpgradeBattery,
+                    onUpgradeCooling = onUpgradeCooling,
                     onDelete = onDelete,
                 )
                 DroneDetailUiState.NotFound -> NotFoundBox(onBack)
@@ -133,16 +144,21 @@ private fun LoadingBox() {
 private fun ContentBox(
     drone: Drone,
     telemetry: DroneTelemetryDto,
+    credits: Int,
     soundManager: SoundManager,
     onRename: (String) -> Unit,
+    onSetBase: (String) -> Unit,
     onCollectData: () -> Unit,
     onTransmitData: () -> Unit,
     onHibernate: () -> Unit,
     onReset: () -> Unit,
+    onStartMission: (Int) -> Unit,
+    onUpgradeBattery: () -> Unit,
+    onUpgradeCooling: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val style = drone.status.style()
-    val base = baseFor(drone.id)
+    val currentBase = baseFor(drone.baseCity)
     val weatherDesc = weatherDescription(telemetry.weather.weatherCode)
 
     var isEditingName by remember { mutableStateOf(value = false) }
@@ -158,6 +174,27 @@ private fun ContentBox(
             modifier = Modifier.padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = drone.rankName,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = DroneColors.Cyan,
+                )
+                Text(
+                    text = "Кредиты: $credits ⚡",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = DroneColors.Good,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             DroneImage(
                 status = drone.status,
                 modifier = Modifier
@@ -231,18 +268,71 @@ private fun ContentBox(
                 )
             }
 
+            if (drone.status == Drone.Status.ON_MISSION) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Выполняется полёт: еще ${drone.activeMissionRemaining} сек",
+                    color = DroneColors.Cyan,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                LinearProgressIndicator(
+                    progress = { 1f - (drone.activeMissionRemaining.toFloat() / drone.activeMissionDuration) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .padding(top = 4.dp),
+                    color = DroneColors.Cyan,
+                    trackColor = DroneColors.SurfaceAlt,
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
-            DetailMetricBar("Заряд батареи", drone.battery, "%", DroneColors.Cyan)
+            DetailMetricBar("Заряд батареи", drone.battery, "% (макс ${drone.maxBattery}%)", DroneColors.Cyan)
             DetailMetricBar("Заполненность памяти", drone.cargo, "%", DroneColors.Pink)
             DetailMetricBar(
                 "Температура ядра",
                 drone.temperature,
-                "°C",
+                "°C (нагрев +${drone.heatRate}°C)",
                 if (drone.temperature >= 80) DroneColors.Danger else DroneColors.Good,
             )
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            // Селектор базы города дислокации
+            Text(
+                text = "Выбор базы дислокации дрона:",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = DroneColors.Cyan,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp),
+            )
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                items(ALL_BASES) { b ->
+                    val isSelected = b.city.equals(drone.baseCity, ignoreCase = true)
+                    Button(
+                        onClick = {
+                            soundManager.play(SoundManager.Effect.CLICK)
+                            onSetBase(b.city)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isSelected) DroneColors.Cyan else DroneColors.SurfaceAlt,
+                            contentColor = if (isSelected) Color.Black else Color.White,
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    ) {
+                        Text(b.city, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -255,7 +345,7 @@ private fun ContentBox(
                         color = DroneColors.Cyan,
                         fontSize = 13.sp,
                     )
-                    Text("База: ${base.city} (${base.latitude}, ${base.longitude})", color = Color.White, fontSize = 12.sp)
+                    Text("База: ${currentBase.city} (${currentBase.latitude}, ${currentBase.longitude})", color = Color.White, fontSize = 12.sp)
                     Text("Погода: $weatherDesc, ветер ${telemetry.weather.windSpeed} м/с", color = Color.White, fontSize = 12.sp)
                     Text("Модель: ${telemetry.model}", color = Color.White, fontSize = 12.sp)
                     Text("Прошивка: ${telemetry.firmware}", color = Color.White, fontSize = 12.sp)
@@ -268,6 +358,102 @@ private fun ContentBox(
     }
 
     Spacer(modifier = Modifier.height(20.dp))
+
+    // Секция вылета на миссии с расчетом стоимости
+    Text(
+        text = "Разведывательные вылеты (заправка ⚡):",
+        fontWeight = FontWeight.Bold,
+        color = DroneColors.Cyan,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 6.dp),
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        val cost15 = drone.missionLaunchCost(15)
+        val cost30 = drone.missionLaunchCost(30)
+        val cost60 = drone.missionLaunchCost(60)
+
+        Button(
+            onClick = {
+                soundManager.play(SoundManager.Effect.SUCCESS)
+                onStartMission(15)
+            },
+            enabled = drone.canStartMission(15, credits),
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
+            contentPadding = PaddingValues(4.dp),
+        ) {
+            Text("15с (-${cost15}⚡)", fontWeight = FontWeight.Bold, fontSize = 10.sp)
+        }
+        Button(
+            onClick = {
+                soundManager.play(SoundManager.Effect.SUCCESS)
+                onStartMission(30)
+            },
+            enabled = drone.canStartMission(30, credits),
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
+            contentPadding = PaddingValues(4.dp),
+        ) {
+            Text("30с (-${cost30}⚡)", fontWeight = FontWeight.Bold, fontSize = 10.sp)
+        }
+        Button(
+            onClick = {
+                soundManager.play(SoundManager.Effect.SUCCESS)
+                onStartMission(60)
+            },
+            enabled = drone.canStartMission(60, credits),
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Pink, contentColor = Color.White),
+            contentPadding = PaddingValues(4.dp),
+        ) {
+            Text("60с (-${cost60}⚡)", fontWeight = FontWeight.Bold, fontSize = 10.sp)
+        }
+    }
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    // Секция Апгрейдов
+    Text(
+        text = "Улучшения (Ранг ${drone.rankLevel}, цена ${drone.upgradeCost}⚡):",
+        fontWeight = FontWeight.Bold,
+        color = DroneColors.Pink,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 6.dp),
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedButton(
+            onClick = {
+                soundManager.play(SoundManager.Effect.SUCCESS)
+                onUpgradeBattery()
+            },
+            enabled = credits >= drone.upgradeCost,
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Cyan),
+        ) {
+            Text("+${drone.batteryBoostAmount}% Емкость", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        }
+        OutlinedButton(
+            onClick = {
+                soundManager.play(SoundManager.Effect.SUCCESS)
+                onUpgradeCooling()
+            },
+            enabled = (credits >= drone.upgradeCost) && (drone.heatRate > 5),
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Pink),
+        ) {
+            Text("-${drone.coolingBoostAmount}°C Нагрев", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+
+    Spacer(modifier = Modifier.height(16.dp))
 
     Button(
         onClick = {

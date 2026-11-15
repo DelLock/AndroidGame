@@ -11,13 +11,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 
-/**
- * Векторная отрисовка дронов внутри приложения через Canvas.
- * - OVERHEATED: асимметричный неровный клубящийся дым над раскаленным корпусом.
- * - FULL_CARGO: зеленый округленный (шарообразный) корпус без сторонних фоновых фигур.
- * - DEPLETED: спит — над дроном поднимаются синие буквы Z.
- * - NORMAL: четкий металлический корпус с неоново-голубым сенсором.
- */
 @Composable
 fun DroneImage(
     status: Drone.Status,
@@ -25,6 +18,7 @@ fun DroneImage(
 ) {
     val statusColor = when (status) {
         Drone.Status.NORMAL -> Color(0xFF1976D2)
+        Drone.Status.ON_MISSION -> Color(0xFF00E5FF)
         Drone.Status.OVERHEATED -> Color(0xFFD32F2F)
         Drone.Status.DEPLETED -> Color(0xFFF57C00)
         Drone.Status.FULL_CARGO -> Color(0xFF388E3C)
@@ -46,7 +40,7 @@ fun DroneImage(
                 drawCircle(color = Color(0x33ECEFF1), radius = w * 0.22f, center = Offset(cx - (w * 0.02f), cy - (h * 0.48f)))
             }
 
-            // 2. Синие буквы Z при низком заряде (спящий режим)
+            // 2. Синие буквы Z при низком заряде
             if (status == Drone.Status.DEPLETED) {
                 drawZ(
                     color = Color(0xFF03A9F4),
@@ -114,6 +108,7 @@ fun DroneImage(
                 Drone.Status.OVERHEATED -> Color(0xFF3E2723)
                 Drone.Status.DEPLETED -> Color(0xFF1C2833)
                 Drone.Status.FULL_CARGO -> Color(0xFF2E7D32)
+                Drone.Status.ON_MISSION -> Color(0xFF0F2634)
                 Drone.Status.NORMAL -> Color(0xFF263238)
             }
 
@@ -128,6 +123,7 @@ fun DroneImage(
             val rimColor = when (status) {
                 Drone.Status.OVERHEATED -> Color(0xFFFF5722)
                 Drone.Status.FULL_CARGO -> Color(0xFF81C784)
+                Drone.Status.ON_MISSION -> Color(0xFF00E5FF)
                 else -> Color(0xFF78909C)
             }
 
@@ -145,6 +141,7 @@ fun DroneImage(
                 Drone.Status.OVERHEATED -> Color(0xFFFF3D00)
                 Drone.Status.DEPLETED -> Color(0xFF546E7A)
                 Drone.Status.FULL_CARGO -> Color(0xFF00E676)
+                Drone.Status.ON_MISSION -> Color(0xFF00E5FF)
                 Drone.Status.NORMAL -> Color(0xFF00E5FF)
             }
 
@@ -175,9 +172,6 @@ private fun DrawScope.drawZ(color: Color, topLeft: Offset, zSize: Float, strokeW
     drawLine(color, start = Offset(topLeft.x, topLeft.y + zSize), end = Offset(topLeft.x + zSize, topLeft.y + zSize), strokeWidth = strokeWidth)
 }
 
-/**
- * Холдеры графика/иконок состояний (перегрев, разрядка, переполнение, норма)
- */
 @Composable
 fun StatusImage(
     status: Drone.Status,
@@ -191,6 +185,13 @@ fun StatusImage(
             val cy = h / 2f
 
             when (status) {
+                Drone.Status.ON_MISSION -> {
+                    val cyan = Color(0xFF00E5FF)
+                    drawCircle(color = Color(0xFF0F2634), radius = w * 0.45f, center = Offset(cx, cy))
+                    drawCircle(color = cyan, radius = w * 0.45f, center = Offset(cx, cy), style = Stroke(width = w * 0.06f))
+                    drawCircle(color = cyan, radius = w * 0.20f, center = Offset(cx, cy), style = Stroke(width = w * 0.04f))
+                }
+
                 Drone.Status.OVERHEATED -> {
                     val red = Color(0xFFD32F2F)
                     drawCircle(color = Color(0xFFFFEBEE), radius = w * 0.45f, center = Offset(cx, cy))

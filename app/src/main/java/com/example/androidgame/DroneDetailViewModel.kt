@@ -6,6 +6,8 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 sealed interface DroneDetailUiState {
@@ -13,6 +15,7 @@ sealed interface DroneDetailUiState {
     data class Content(
         val drone: Drone,
         val telemetry: DroneTelemetryDto,
+        val credits: Int,
     ) : DroneDetailUiState
     data object NotFound : DroneDetailUiState
     data class Error(val canRetry: Boolean) : DroneDetailUiState
@@ -30,6 +33,14 @@ class DroneDetailViewModel(
 
     init {
         load()
+        viewModelScope.launch {
+            while (isActive) {
+                delay(1000L)
+                val isStormy = (uiState as? DroneDetailUiState.Content)?.telemetry?.weather?.isStormy ?: false
+                repo.tickMissions(isStormy)
+                refreshState()
+            }
+        }
     }
 
     fun onRetry() = load()
@@ -37,6 +48,11 @@ class DroneDetailViewModel(
     fun onRename(newName: String) {
         repo.renameDrone(droneId, newName)
         refreshState()
+    }
+
+    fun onSetBase(baseCity: String) {
+        repo.setDroneBase(droneId, baseCity)
+        load() // Re-fetch telemetry for the new base city
     }
 
     fun onCollectData() {
@@ -60,6 +76,21 @@ class DroneDetailViewModel(
         refreshState()
     }
 
+    fun onStartMission(durationSeconds: Int) {
+        repo.startMission(droneId, durationSeconds)
+        refreshState()
+    }
+
+    fun onUpgradeBattery() {
+        repo.upgradeBattery(droneId)
+        refreshState()
+    }
+
+    fun onUpgradeCooling() {
+        repo.upgradeCooling(droneId)
+        refreshState()
+    }
+
     fun onDelete() = repo.deleteDrone(droneId)
 
     private fun load() {
@@ -77,7 +108,7 @@ class DroneDetailViewModel(
             uiState = if (updatedDrone == null) {
                 DroneDetailUiState.NotFound
             } else {
-                current.copy(drone = updatedDrone)
+                current.copy(drone = updatedDrone, credits = repo.credits)
             }
         }
     }
@@ -86,7 +117,7 @@ class DroneDetailViewModel(
         val drone = repo.drone(droneId) ?: return DroneDetailUiState.NotFound
         return try {
             val telemetry = repo.fetchTelemetry(droneId)
-            DroneDetailUiState.Content(drone, telemetry)
+            DroneDetailUiState.Content(drone, telemetry, repo.credits)
         } catch (_: DroneNotFoundException) {
             DroneDetailUiState.NotFound
         } catch (e: DroneNetworkException) {
