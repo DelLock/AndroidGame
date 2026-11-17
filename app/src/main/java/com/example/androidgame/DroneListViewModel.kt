@@ -17,6 +17,8 @@ data class DroneListUiState(
     val searchQuery: String = "",
     val selectedFilter: DroneFilter = DroneFilter.ALL,
     val lastDeletedDroneName: String? = null,
+    val undoTimerSeconds: Int = 0,
+    val missionNoticeMessage: String? = null,
 )
 
 class DroneListViewModel(private val repo: DroneRepository) : ViewModel() {
@@ -45,6 +47,8 @@ class DroneListViewModel(private val repo: DroneRepository) : ViewModel() {
                 searchQuery = searchQuery,
                 selectedFilter = selectedFilter,
                 lastDeletedDroneName = repo.lastDeletedDrone?.name,
+                undoTimerSeconds = repo.undoTimerSeconds,
+                missionNoticeMessage = repo.lastCompletedMissionMessage,
             )
         }
 
@@ -66,8 +70,19 @@ class DroneListViewModel(private val repo: DroneRepository) : ViewModel() {
     }
 
     fun onAddDrone(name: String? = null) = repo.addDrone(name)
-    fun onDeleteDrone(id: Int) = repo.deleteDrone(id)
-    fun onRestoreDeletedDrone() = repo.restoreLastDeletedDrone()
+
+    fun onDeleteDrone(id: Int) {
+        repo.deleteDrone(id)
+    }
+
+    fun onRestoreDeletedDrone() {
+        repo.restoreLastDeletedDrone()
+    }
+
+    fun onDismissMissionNotice() {
+        repo.clearMissionNotice()
+    }
+
     fun onHibernateAll() = repo.hibernateAll()
     fun onTransmitAll() = repo.transmitAll()
 }

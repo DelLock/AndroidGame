@@ -52,7 +52,7 @@ class DroneDetailViewModel(
 
     fun onSetBase(baseCity: String) {
         repo.setDroneBase(droneId, baseCity)
-        load() // Re-fetch telemetry for the new base city
+        load()
     }
 
     fun onCollectData() {
@@ -83,6 +83,11 @@ class DroneDetailViewModel(
 
     fun onUpgradeBattery() {
         repo.upgradeBattery(droneId)
+        refreshState()
+    }
+
+    fun onUpgradeCargo() {
+        repo.upgradeCargo(droneId)
         refreshState()
     }
 

@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -55,6 +56,7 @@ fun DroneDetailScreen(
     onReset: () -> Unit,
     onStartMission: (Int) -> Unit,
     onUpgradeBattery: () -> Unit,
+    onUpgradeCargo: () -> Unit,
     onUpgradeCooling: () -> Unit,
     onDelete: () -> Unit,
     onBack: () -> Unit,
@@ -110,6 +112,7 @@ fun DroneDetailScreen(
                     onReset = onReset,
                     onStartMission = onStartMission,
                     onUpgradeBattery = onUpgradeBattery,
+                    onUpgradeCargo = onUpgradeCargo,
                     onUpgradeCooling = onUpgradeCooling,
                     onDelete = onDelete,
                 )
@@ -154,6 +157,7 @@ private fun ContentBox(
     onReset: () -> Unit,
     onStartMission: (Int) -> Unit,
     onUpgradeBattery: () -> Unit,
+    onUpgradeCargo: () -> Unit,
     onUpgradeCooling: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -163,6 +167,8 @@ private fun ContentBox(
 
     var isEditingName by remember { mutableStateOf(value = false) }
     var nameInput by remember(drone.name) { mutableStateOf(drone.name) }
+    var showResetConfirmDialog by remember { mutableStateOf(value = false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(value = false) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -290,7 +296,7 @@ private fun ContentBox(
             Spacer(modifier = Modifier.height(16.dp))
 
             DetailMetricBar("Заряд батареи", drone.battery, "% (макс ${drone.maxBattery}%)", DroneColors.Cyan)
-            DetailMetricBar("Заполненность памяти", drone.cargo, "%", DroneColors.Pink)
+            DetailMetricBar("Заполненность памяти", drone.cargo, "% (макс ${drone.maxCargo}%)", DroneColors.Pink)
             DetailMetricBar(
                 "Температура ядра",
                 drone.temperature,
@@ -359,7 +365,7 @@ private fun ContentBox(
 
     Spacer(modifier = Modifier.height(20.dp))
 
-    // Секция вылета на миссии с расчетом стоимости
+    // Секция вылета на миссии
     Text(
         text = "Разведывательные вылеты (заправка ⚡):",
         fontWeight = FontWeight.Bold,
@@ -416,7 +422,7 @@ private fun ContentBox(
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    // Секция Апгрейдов
+    // Секция Апгрейдов (Батарея, Память, Охлаждение)
     Text(
         text = "Улучшения (Ранг ${drone.rankLevel}, цена ${drone.upgradeCost}⚡):",
         fontWeight = FontWeight.Bold,
@@ -427,7 +433,7 @@ private fun ContentBox(
     )
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         OutlinedButton(
             onClick = {
@@ -437,8 +443,21 @@ private fun ContentBox(
             enabled = credits >= drone.upgradeCost,
             modifier = Modifier.weight(1f),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Cyan),
+            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
         ) {
-            Text("+${drone.batteryBoostAmount}% Емкость", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text("+${drone.batteryBoostAmount}% Заряд", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+        OutlinedButton(
+            onClick = {
+                soundManager.play(SoundManager.Effect.SUCCESS)
+                onUpgradeCargo()
+            },
+            enabled = credits >= drone.upgradeCost,
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Good),
+            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+        ) {
+            Text("+${drone.cargoBoostAmount}% Память", fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
         OutlinedButton(
             onClick = {
@@ -448,8 +467,9 @@ private fun ContentBox(
             enabled = (credits >= drone.upgradeCost) && (drone.heatRate > 5),
             modifier = Modifier.weight(1f),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Pink),
+            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
         ) {
-            Text("-${drone.coolingBoostAmount}°C Нагрев", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text("-${drone.coolingBoostAmount}°C Нагрев", fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
     }
 
@@ -500,7 +520,7 @@ private fun ContentBox(
     OutlinedButton(
         onClick = {
             soundManager.play(SoundManager.Effect.WARNING)
-            onReset()
+            showResetConfirmDialog = true
         },
         modifier = Modifier.fillMaxWidth(),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Cyan),
@@ -513,12 +533,72 @@ private fun ContentBox(
     OutlinedButton(
         onClick = {
             soundManager.play(SoundManager.Effect.DELETE)
-            onDelete()
+            showDeleteConfirmDialog = true
         },
         modifier = Modifier.fillMaxWidth(),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Danger),
     ) {
         Text("Списать (удалить дрон)")
+    }
+
+    // Диалог подтверждения СБРОСА
+    if (showResetConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirmDialog = false },
+            title = { Text("Подтверждение сброса", color = DroneColors.Cyan, fontWeight = FontWeight.Bold) },
+            text = { Text("Вы действительно хотите сбросить все параметры дрона '${drone.name}' до заводских настроек?", color = Color.White) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        soundManager.play(SoundManager.Effect.WARNING)
+                        onReset()
+                        showResetConfirmDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
+                ) {
+                    Text("Сбросить", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showResetConfirmDialog = false },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Muted),
+                ) {
+                    Text("Отмена")
+                }
+            },
+            containerColor = DroneColors.Surface,
+        )
+    }
+
+    // Диалог подтверждения СПИСАНИЯ/УДАЛЕНИЯ
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            title = { Text("Списание дрона", color = DroneColors.Danger, fontWeight = FontWeight.Bold) },
+            text = { Text("Вы действительно хотите списать и удалить дрон '${drone.name}' из флота?", color = Color.White) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        soundManager.play(SoundManager.Effect.DELETE)
+                        onDelete()
+                        showDeleteConfirmDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Danger, contentColor = Color.White),
+                ) {
+                    Text("Списать", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showDeleteConfirmDialog = false },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Muted),
+                ) {
+                    Text("Отмена")
+                }
+            },
+            containerColor = DroneColors.Surface,
+        )
     }
 }
 

@@ -7,7 +7,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -18,6 +22,7 @@ class DroneRepository(
     private val context: Context? = null,
     private val api: DroneApi? = null,
 ) {
+    private val scope = CoroutineScope(Dispatchers.Default)
     private val json = Json { ignoreUnknownKeys = true }
     private val prefs: SharedPreferences? = context?.getSharedPreferences("drone_hub_storage", Context.MODE_PRIVATE)
 
@@ -30,7 +35,22 @@ class DroneRepository(
     var lastDeletedDrone by mutableStateOf<Drone?>(null)
         private set
 
+    var undoTimerSeconds by mutableStateOf(0)
+        private set
+
+    var lastCompletedMissionMessage by mutableStateOf<String?>(null)
+        private set
+
+    var missionNoticeTimerSeconds by mutableStateOf(0)
+        private set
+
+    private val unhandledCompletedMissions = mutableListOf<String>()
+    private var totalPendingReward = 0
+
+    private var undoJob: Job? = null
+    private var missionNoticeJob: Job? = null
     private var nextId = (drones.maxOfOrNull { it.id } ?: 0) + 1
+    private var lastTickTimestamp = 0L
 
     fun drone(id: Int): Drone? = drones.find { it.id == id }
 
@@ -111,7 +131,7 @@ class DroneRepository(
     }
 
     fun addDrone(customName: String? = null) {
-        val defaultName = "Дрон-разведчик X-%02d".format(nextId)
+        val defaultName = "Дрон X-%02d".format(nextId)
         val droneName = if (customName.isNullOrBlank()) defaultName else customName.trim()
         val defaultBase = ALL_BASES[(nextId - 1) % ALL_BASES.size].city
         val newDrone = Drone(
@@ -132,14 +152,62 @@ class DroneRepository(
         lastDeletedDrone = target
         drones -= target
         persistState()
+
+        undoTimerSeconds = 10
+        undoJob?.cancel()
+        undoJob = scope.launch {
+            while (undoTimerSeconds > 0) {
+                delay(1000L)
+                undoTimerSeconds--
+            }
+            lastDeletedDrone = null
+        }
     }
 
     fun restoreLastDeletedDrone() {
-        val target = lastDeletedDrone ?: return
-        if (drone(target.id) == null) {
+        undoJob?.cancel()
+        val target = lastDeletedDrone
+        if ((target != null) && (drone(target.id) == null)) {
             drones += target
-            lastDeletedDrone = null
-            persistState()
+        }
+        lastDeletedDrone = null
+        undoTimerSeconds = 0
+        persistState()
+    }
+
+    fun clearLastDeletedDrone() {
+        undoJob?.cancel()
+        lastDeletedDrone = null
+        undoTimerSeconds = 0
+    }
+
+    fun clearMissionNotice() {
+        missionNoticeJob?.cancel()
+        unhandledCompletedMissions.clear()
+        totalPendingReward = 0
+        lastCompletedMissionMessage = null
+        missionNoticeTimerSeconds = 0
+    }
+
+    private fun triggerMissionNotice(droneName: String, reward: Int, cargoGain: Int) {
+        unhandledCompletedMissions.add(droneName)
+        totalPendingReward += reward
+
+        val count = unhandledCompletedMissions.size
+        lastCompletedMissionMessage = if (count == 1) {
+            "Дрон '$droneName' успешно вернулся с вылета! (+$reward⚡, +$cargoGain% памяти)"
+        } else {
+            "Дрон '$droneName' вернулся! (+$reward⚡, еще +${count - 1} в очереди, всего +$totalPendingReward⚡)"
+        }
+
+        missionNoticeTimerSeconds = 8
+        missionNoticeJob?.cancel()
+        missionNoticeJob = scope.launch {
+            while (missionNoticeTimerSeconds > 0) {
+                delay(1000L)
+                missionNoticeTimerSeconds--
+            }
+            clearMissionNotice()
         }
     }
 
@@ -161,7 +229,7 @@ class DroneRepository(
         if (!current.canCollectData) return
         val cost = if (isWindy) WINDY_COLLECT_COST else NORMAL_COLLECT_COST
         val updated = current.copy(
-            cargo = (current.cargo + 25).coerceAtMost(100),
+            cargo = (current.cargo + 25).coerceAtMost(current.maxCargo),
             battery = (current.battery - cost).coerceAtLeast(0),
             temperature = (current.temperature + current.heatRate).coerceAtMost(100),
         )
@@ -171,7 +239,7 @@ class DroneRepository(
     fun transmitData(id: Int) {
         val current = drone(id) ?: return
         if (!current.canTransmitData) return
-        val reward = current.cargo * 2 * current.rankLevel
+        val reward = current.cargo / 2
         credits += reward
         val updated = current.copy(
             cargo = 0,
@@ -194,9 +262,16 @@ class DroneRepository(
     fun resetDrone(id: Int) {
         val current = drone(id) ?: return
         val updated = current.copy(
-            battery = current.maxBattery,
+            rankLevel = 1,
+            battery = 100,
+            maxBattery = 100,
             cargo = 0,
+            maxCargo = 100,
             temperature = 20,
+            heatRate = 15,
+            missionsCompleted = 0,
+            activeMissionDuration = 0,
+            activeMissionRemaining = 0,
         )
         updateDrone(updated)
     }
@@ -214,7 +289,7 @@ class DroneRepository(
         var totalReward = 0
         drones = drones.map { drone ->
             if (drone.canTransmitData) {
-                totalReward += drone.cargo * 2 * drone.rankLevel
+                totalReward += drone.cargo / 2
                 drone.copy(
                     cargo = 0,
                     battery = (drone.battery - 15).coerceAtLeast(0),
@@ -245,6 +320,10 @@ class DroneRepository(
     }
 
     fun tickMissions(isStormyWeather: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if ((now - lastTickTimestamp) < 900L) return
+        lastTickTimestamp = now
+
         var stateChanged = false
         drones = drones.map { drone ->
             if (drone.activeMissionRemaining > 0) {
@@ -252,6 +331,7 @@ class DroneRepository(
                 val newRemaining = drone.activeMissionRemaining - 1
 
                 if (isStormyWeather && (drone.activeMissionDuration >= 30) && (newRemaining == (drone.activeMissionDuration / 2))) {
+                    triggerMissionNotice(drone.name, 0, 0)
                     drone.copy(
                         activeMissionDuration = 0,
                         activeMissionRemaining = 0,
@@ -261,9 +341,9 @@ class DroneRepository(
                     )
                 } else if (newRemaining <= 0) {
                     val reward = when (drone.activeMissionDuration) {
-                        60 -> 900 * drone.rankLevel
-                        30 -> 300 * drone.rankLevel
-                        else -> 100 * drone.rankLevel
+                        60 -> 350
+                        30 -> 150
+                        else -> 60
                     }
                     val cargoGain = when (drone.activeMissionDuration) {
                         60 -> 100
@@ -278,12 +358,13 @@ class DroneRepository(
                     credits += reward
                     val totalMissions = drone.missionsCompleted + expGain
                     val newRankLevel = ((totalMissions / 3) + 1).coerceAtMost(5)
+                    triggerMissionNotice(drone.name, reward, cargoGain)
                     drone.copy(
                         activeMissionDuration = 0,
                         activeMissionRemaining = 0,
                         missionsCompleted = totalMissions,
                         rankLevel = newRankLevel,
-                        cargo = (drone.cargo + cargoGain).coerceAtMost(100),
+                        cargo = (drone.cargo + cargoGain).coerceAtMost(drone.maxCargo),
                         temperature = (drone.temperature + 10).coerceAtMost(100),
                     )
                 } else {
@@ -303,6 +384,20 @@ class DroneRepository(
         val updated = current.copy(
             maxBattery = newMax,
             battery = (current.battery + current.batteryBoostAmount).coerceAtMost(newMax),
+        )
+        updateDrone(updated)
+        return true
+    }
+
+    fun upgradeCargo(id: Int): Boolean {
+        val current = drone(id) ?: return false
+        val cost = current.upgradeCost
+        if (credits < cost) return false
+        credits -= cost
+        val newMax = current.maxCargo + current.cargoBoostAmount
+        val updated = current.copy(
+            maxCargo = newMax,
+            cargo = current.cargo.coerceAtMost(newMax),
         )
         updateDrone(updated)
         return true

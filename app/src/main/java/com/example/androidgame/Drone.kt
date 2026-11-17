@@ -11,6 +11,7 @@ data class Drone(
     val battery: Int = 100,
     val maxBattery: Int = 100,
     val cargo: Int = 0,
+    val maxCargo: Int = 100,
     val temperature: Int = 20,
     val heatRate: Int = 15,
     val missionsCompleted: Int = 0,
@@ -22,36 +23,39 @@ data class Drone(
             activeMissionRemaining > 0 -> Status.ON_MISSION
             temperature >= 80 -> Status.OVERHEATED
             battery <= 10 -> Status.DEPLETED
-            cargo >= 100 -> Status.FULL_CARGO
+            cargo >= maxCargo -> Status.FULL_CARGO
             else -> Status.NORMAL
         }
 
     val rankName: String
         get() = when (rankLevel) {
-            1 -> "Новобранец (Ранг 1)"
-            2 -> "Оператор (Ранг 2)"
-            3 -> "Ветеран (Ранг 3)"
-            4 -> "Спецназ (Ранг 4)"
-            else -> "Ас флота (Ранг 5)"
+            1 -> "Новобранец"
+            2 -> "Оператор"
+            3 -> "Ветеран"
+            4 -> "Спецназ"
+            else -> "Ас флота"
         }
 
     val upgradeCost: Int
-        get() = 100 * rankLevel
+        get() = 120 * rankLevel
 
     val batteryBoostAmount: Int
         get() = 20 * rankLevel
+
+    val cargoBoostAmount: Int
+        get() = 25 * rankLevel
 
     val coolingBoostAmount: Int
         get() = (2 * rankLevel).coerceAtMost(5)
 
     fun missionLaunchCost(durationSeconds: Int): Int = when (durationSeconds) {
         60 -> 150 * rankLevel
-        30 -> 60 * rankLevel
-        else -> 20 * rankLevel
+        30 -> 70 * rankLevel
+        else -> 30 * rankLevel
     }
 
     val canCollectData: Boolean
-        get() = (status != Status.ON_MISSION) && (status != Status.OVERHEATED) && (status != Status.DEPLETED) && (cargo < 100)
+        get() = (status != Status.ON_MISSION) && (status != Status.OVERHEATED) && (status != Status.DEPLETED) && (cargo < maxCargo)
 
     val canTransmitData: Boolean
         get() = (status != Status.ON_MISSION) && (cargo > 0) && (battery > 10)
@@ -84,7 +88,7 @@ fun startDrones(): List<Drone> = List(12) { i ->
     }
     Drone(
         id = id,
-        name = "Дрон-разведчик X-%02d".format(id),
+        name = "Дрон X-%02d".format(id),
         baseCity = base.city,
         battery = initialBattery,
         cargo = initialCargo,

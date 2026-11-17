@@ -38,6 +38,7 @@ fun DroneNavigation(repo: DroneRepository, modifier: Modifier = Modifier) {
                     onAddDrone = viewModel::onAddDrone,
                     onDeleteDrone = viewModel::onDeleteDrone,
                     onRestoreDeletedDrone = viewModel::onRestoreDeletedDrone,
+                    onDismissMissionNotice = viewModel::onDismissMissionNotice,
                     onHibernateAll = viewModel::onHibernateAll,
                     onTransmitAll = viewModel::onTransmitAll,
                     onSelectDrone = { id ->
@@ -65,6 +66,7 @@ fun DroneNavigation(repo: DroneRepository, modifier: Modifier = Modifier) {
                     onReset = viewModel::onReset,
                     onStartMission = viewModel::onStartMission,
                     onUpgradeBattery = viewModel::onUpgradeBattery,
+                    onUpgradeCargo = viewModel::onUpgradeCargo,
                     onUpgradeCooling = viewModel::onUpgradeCooling,
                     onDelete = {
                         viewModel.onDelete()
