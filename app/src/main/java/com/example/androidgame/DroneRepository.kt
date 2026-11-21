@@ -14,7 +14,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import retrofit2.HttpException
@@ -22,8 +21,8 @@ import java.io.IOException
 import kotlin.time.Duration.Companion.seconds
 
 class DroneRepository(
+    private val openMeteoApi: OpenMeteoApi,
     private val context: Context? = null,
-    private val openMeteoApi: OpenMeteoApi? = null,
 ) {
     private val scope = CoroutineScope(Dispatchers.Default)
     private val json = Json { ignoreUnknownKeys = true }
@@ -96,57 +95,34 @@ class DroneRepository(
         val target = drone(id) ?: throw DroneNotFoundException()
         val base = baseFor(target.baseCity)
 
-        var weather = CurrentWeatherDto()
-        var isOnline = false
-
-        if (openMeteoApi != null) {
-            try {
-                val response = retryIO { openMeteoApi.getWeather(base.latitude, base.longitude) }
-                weather = response.currentWeather
-                cityWeatherCache[base.city] = weather
-                isOnline = true
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: IOException) {
-                weather = cityWeatherCache[base.city] ?: CurrentWeatherDto()
-                isOnline = false
-            } catch (e: HttpException) {
-                if (e.code() == 404) throw DroneNotFoundException()
-                throw DroneNetworkException(canRetry = e.code() >= 500, cause = e)
-            } catch (e: SerializationException) {
-                Log.e("DroneRepository", "Ошибка десериализации ответа сервера для дрона $id", e)
+        try {
+            val response = retryIO { openMeteoApi.getWeather(base.latitude, base.longitude) }
+            cityWeatherCache[base.city] = response.currentWeather
+            return DroneTelemetryDto(
+                model = "CyberScout ${target.name}",
+                firmware = "v3.12.8-cyber-LIVE",
+                rangeKm = 100 + (target.id * 10),
+                sensorType = "LiDAR / Quantum Optical (Онлайн)",
+                weather = response.currentWeather,
+                notes = "Прямой поток метеоданных успешно получен по сети с Open-Meteo API (${base.city}).",
+                isOnlineData = true,
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: IOException) {
+            throw DroneNetworkException(canRetry = true)
+        } catch (e: HttpException) {
+            if (e.code() == 404) {
+                throw DroneNotFoundException()
+            } else if (e.code() >= 500) {
+                throw DroneNetworkException(canRetry = true, cause = e)
+            } else {
                 throw DroneNetworkException(canRetry = false, cause = e)
             }
-        } else if (context != null) {
-            try {
-                withContext(Dispatchers.IO) {
-                    val assetPath = "api-data/telemetry-$id.json"
-                    context.assets.open(assetPath).use { stream ->
-                        val jsonString = stream.bufferedReader().readText()
-                        val assetTelemetry = json.decodeFromString<DroneTelemetryDto>(jsonString)
-                        weather = assetTelemetry.weather
-                    }
-                }
-            } catch (_: IOException) {
-                weather = CurrentWeatherDto()
-            }
+        } catch (e: SerializationException) {
+            Log.e("DroneRepository", "Ошибка десериализации ответа сервера для дрона $id", e)
+            throw DroneNetworkException(canRetry = false, cause = e)
         }
-
-        val noteText = if (isOnline) {
-            "Прямой поток метеоданных успешно получен по сети с Open-Meteo API (${base.city})."
-        } else {
-            "Сеть недоступна. Отображается локальная оффлайн-спецификация из кэша."
-        }
-
-        return DroneTelemetryDto(
-            model = "CyberScout ${target.name}",
-            firmware = if (isOnline) "v3.12.8-cyber-LIVE" else "v3.12.8-cyber-OFFLINE",
-            rangeKm = 100 + (target.id * 10),
-            sensorType = if (isOnline) "LiDAR / Quantum Optical (Онлайн)" else "LiDAR (Локальный режим)",
-            weather = weather,
-            notes = noteText,
-            isOnlineData = isOnline,
-        )
     }
 
     fun addDrone(customName: String? = null) {

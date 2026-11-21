@@ -117,7 +117,7 @@ fun DroneDetailScreen(
                     onDelete = onDelete,
                 )
                 DroneDetailUiState.NotFound -> NotFoundBox(onBack)
-                is DroneDetailUiState.Error -> ErrorBox(state.canRetry, onRetry)
+                is DroneDetailUiState.Error -> ErrorBox(state.canRetry, state.message, onRetry)
             }
         }
     }
@@ -635,13 +635,13 @@ private fun NotFoundBox(onBack: () -> Unit) {
 }
 
 @Composable
-private fun ErrorBox(canRetry: Boolean, onRetry: () -> Unit) {
+private fun ErrorBox(canRetry: Boolean, message: String, onRetry: () -> Unit) {
     Column(
         modifier = Modifier.padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = if (canRetry) "Не удалось подключиться к каналу связи дрона" else "Ошибка формата ответа сервера",
+            text = message,
             style = MaterialTheme.typography.titleMedium,
             color = DroneColors.Danger,
             textAlign = TextAlign.Center,
@@ -649,7 +649,7 @@ private fun ErrorBox(canRetry: Boolean, onRetry: () -> Unit) {
         Spacer(modifier = Modifier.height(16.dp))
         if (canRetry) {
             Button(
-                onClick = { onRetry() },
+                onClick = onRetry,
                 colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
             ) {
                 Text("Повторить загрузку", fontWeight = FontWeight.Bold)

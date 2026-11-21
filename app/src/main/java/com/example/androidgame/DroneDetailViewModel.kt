@@ -19,7 +19,10 @@ sealed interface DroneDetailUiState {
         val credits: Int,
     ) : DroneDetailUiState
     data object NotFound : DroneDetailUiState
-    data class Error(val canRetry: Boolean) : DroneDetailUiState
+    data class Error(
+        val canRetry: Boolean,
+        val message: String = "Не удалось подключиться к каналу связи дрона",
+    ) : DroneDetailUiState
 }
 
 class DroneDetailViewModel(
@@ -31,6 +34,7 @@ class DroneDetailViewModel(
         private set
 
     private var loadJob: Job? = null
+    private var retryCount = 0
 
     init {
         load()
@@ -42,7 +46,17 @@ class DroneDetailViewModel(
         }
     }
 
-    fun onRetry() = load()
+    fun onRetry() {
+        if (retryCount >= 3) {
+            uiState = DroneDetailUiState.Error(
+                canRetry = false,
+                message = "Превышен лимит попыток подключения.",
+            )
+            return
+        }
+        retryCount++
+        load()
+    }
 
     fun onRename(newName: String) {
         repo.renameDrone(droneId, newName)
@@ -51,6 +65,7 @@ class DroneDetailViewModel(
 
     fun onSetBase(baseCity: String) {
         repo.setDroneBase(droneId, baseCity)
+        retryCount = 0
         load()
     }
 
@@ -101,7 +116,11 @@ class DroneDetailViewModel(
         if (loadJob?.isActive == true) return
         loadJob = viewModelScope.launch {
             uiState = DroneDetailUiState.Loading
-            uiState = fetchState()
+            val result = fetchState()
+            if (result is DroneDetailUiState.Content) {
+                retryCount = 0
+            }
+            uiState = result
         }
     }
 
@@ -125,7 +144,10 @@ class DroneDetailViewModel(
         } catch (_: DroneNotFoundException) {
             DroneDetailUiState.NotFound
         } catch (e: DroneNetworkException) {
-            DroneDetailUiState.Error(e.canRetry)
+            DroneDetailUiState.Error(
+                canRetry = e.canRetry,
+                message = if (e.canRetry) "Не удалось подключиться к каналу связи дрона" else "Ошибка формата ответа сервера",
+            )
         }
     }
 }

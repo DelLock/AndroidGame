@@ -7,13 +7,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+class FakeOpenMeteoApi : OpenMeteoApi {
+    override suspend fun getWeather(
+        latitude: Double,
+        longitude: Double,
+        currentWeather: Boolean,
+    ): OpenMeteoResponseDto {
+        return OpenMeteoResponseDto(CurrentWeatherDto(20.0, 5.0, 0))
+    }
+}
+
 class DroneRepositoryTest {
 
     private lateinit var repo: DroneRepository
 
     @Before
     fun setUp() {
-        repo = DroneRepository()
+        repo = DroneRepository(openMeteoApi = FakeOpenMeteoApi())
     }
 
     @Test
