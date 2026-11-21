@@ -68,7 +68,7 @@ class DroneRepository(
 
     private fun loadSavedDrones(): List<Drone> {
         if ((prefs != null) && prefs.contains("saved_drones_list")) {
-            val savedJson = prefs.getString("saved_drones_list", "") ?: ""
+            val savedJson = prefs.getString("saved_drones_list", "[]") ?: "[]"
             try {
                 return json.decodeFromString<List<Drone>>(savedJson)
             } catch (e: Exception) {

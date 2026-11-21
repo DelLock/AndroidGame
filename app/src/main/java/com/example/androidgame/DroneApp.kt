@@ -38,8 +38,8 @@ class DroneApp : Application() {
 
     val repository by lazy {
         DroneRepository(
-            context = this,
             openMeteoApi = openMeteoApi,
+            context = this,
         )
     }
 }
