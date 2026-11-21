@@ -1,22 +1,153 @@
 package com.example.androidgame
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.seconds
 
-data class DroneDetailUiState(
-    val drone: Drone?,
-)
+sealed interface DroneDetailUiState {
+    data object Loading : DroneDetailUiState
+    data class Content(
+        val drone: Drone,
+        val telemetry: DroneTelemetryDto,
+        val credits: Int,
+    ) : DroneDetailUiState
+    data object NotFound : DroneDetailUiState
+    data class Error(
+        val canRetry: Boolean,
+        val message: String = "Не удалось подключиться к каналу связи дрона",
+    ) : DroneDetailUiState
+}
 
 class DroneDetailViewModel(
     private val droneId: Int,
     private val repo: DroneRepository,
 ) : ViewModel() {
-    val uiState: DroneDetailUiState
-        get() = DroneDetailUiState(drone = repo.drone(droneId))
 
-    fun onRename(newName: String) = repo.renameDrone(droneId, newName)
-    fun onCollectData() = repo.collectData(droneId)
-    fun onTransmitData() = repo.transmitData(droneId)
-    fun onHibernate() = repo.hibernate(droneId)
-    fun onReset() = repo.resetDrone(droneId)
+    var uiState: DroneDetailUiState by mutableStateOf(DroneDetailUiState.Loading)
+        private set
+
+    private var loadJob: Job? = null
+    private var retryCount = 0
+
+    init {
+        load()
+        viewModelScope.launch {
+            while (isActive) {
+                delay(1.seconds)
+                refreshState()
+            }
+        }
+    }
+
+    fun onRetry() {
+        if (retryCount >= 3) {
+            uiState = DroneDetailUiState.Error(
+                canRetry = false,
+                message = "Превышен лимит попыток подключения.",
+            )
+            return
+        }
+        retryCount++
+        load()
+    }
+
+    fun onRename(newName: String) {
+        repo.renameDrone(droneId, newName)
+        refreshState()
+    }
+
+    fun onSetBase(baseCity: String) {
+        repo.setDroneBase(droneId, baseCity)
+        retryCount = 0
+        load()
+    }
+
+    fun onCollectData() {
+        val isWindy = (uiState as? DroneDetailUiState.Content)?.telemetry?.weather?.isWindy ?: false
+        repo.collectData(droneId, isWindy)
+        refreshState()
+    }
+
+    fun onTransmitData() {
+        repo.transmitData(droneId)
+        refreshState()
+    }
+
+    fun onHibernate() {
+        repo.hibernate(droneId)
+        refreshState()
+    }
+
+    fun onReset() {
+        repo.resetDrone(droneId)
+        refreshState()
+    }
+
+    fun onStartMission(durationSeconds: Int) {
+        repo.startMission(droneId, durationSeconds)
+        refreshState()
+    }
+
+    fun onUpgradeBattery() {
+        repo.upgradeBattery(droneId)
+        refreshState()
+    }
+
+    fun onUpgradeCargo() {
+        repo.upgradeCargo(droneId)
+        refreshState()
+    }
+
+    fun onUpgradeCooling() {
+        repo.upgradeCooling(droneId)
+        refreshState()
+    }
+
     fun onDelete() = repo.deleteDrone(droneId)
+
+    private fun load() {
+        if (loadJob?.isActive == true) return
+        loadJob = viewModelScope.launch {
+            uiState = DroneDetailUiState.Loading
+            val result = fetchState()
+            if (result is DroneDetailUiState.Content) {
+                retryCount = 0
+            }
+            uiState = result
+        }
+    }
+
+    private fun refreshState() {
+        val current = uiState
+        if (current is DroneDetailUiState.Content) {
+            val updatedDrone = repo.drone(droneId)
+            uiState = if (updatedDrone == null) {
+                DroneDetailUiState.NotFound
+            } else {
+                current.copy(drone = updatedDrone, credits = repo.credits)
+            }
+        }
+    }
+
+    private suspend fun fetchState(): DroneDetailUiState {
+        val drone = repo.drone(droneId) ?: return DroneDetailUiState.NotFound
+        return try {
+            val telemetry = repo.fetchTelemetry(droneId)
+            DroneDetailUiState.Content(drone, telemetry, repo.credits)
+        } catch (_: DroneNotFoundException) {
+            DroneDetailUiState.NotFound
+        } catch (e: DroneNetworkException) {
+            DroneDetailUiState.Error(
+                canRetry = e.canRetry,
+                message = if (e.canRetry) "Не удалось подключиться к каналу связи дрона" else "Ошибка формата ответа сервера",
+            )
+        }
+    }
 }

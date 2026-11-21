@@ -1,0 +1,7 @@
+{
+  "model": "Raven R2",
+  "firmware": "v3.12.7-cyber",
+  "range_km": 150,
+  "sensor_type": "Optical / Ultrasonic",
+  "notes": "Спецификация дрона №7 успешно загружена с сервера штаба."
+}

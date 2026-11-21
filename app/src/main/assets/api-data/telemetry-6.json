@@ -1,0 +1,7 @@
+{
+  "model": "Falcon-7",
+  "firmware": "v3.12.6-cyber",
+  "range_km": 140,
+  "sensor_type": "Infrared / Radar",
+  "notes": "Спецификация дрона №6 успешно загружена с сервера штаба."
+}

@@ -1,0 +1,7 @@
+{
+  "model": "X-Scout Mk-V",
+  "firmware": "v3.12.9-cyber",
+  "range_km": 170,
+  "sensor_type": "LiDAR / Thermal Array",
+  "notes": "Спецификация дрона №9 успешно загружена с сервера штаба."
+}

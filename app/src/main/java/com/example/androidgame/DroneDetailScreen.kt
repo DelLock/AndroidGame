@@ -10,13 +10,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -35,7 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -43,33 +47,46 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun DroneDetailScreen(
     state: DroneDetailUiState,
+    onRetry: () -> Unit,
     onRename: (String) -> Unit,
+    onSetBase: (String) -> Unit,
     onCollectData: () -> Unit,
     onTransmitData: () -> Unit,
     onHibernate: () -> Unit,
     onReset: () -> Unit,
+    onStartMission: (Int) -> Unit,
+    onUpgradeBattery: () -> Unit,
+    onUpgradeCargo: () -> Unit,
+    onUpgradeCooling: () -> Unit,
     onDelete: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val soundManager = remember { SoundManager() }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(state.drone?.name ?: "Карточка дрона") },
+                title = { Text("Карточка дрона") },
                 navigationIcon = {
                     OutlinedButton(
-                        onClick = onBack,
+                        onClick = {
+                            soundManager.play(SoundManager.Effect.CLICK)
+                            onBack()
+                        },
                         modifier = Modifier.padding(start = 8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Cyan),
                     ) {
-                        Text("← Назад")
+                        Text("Назад")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    containerColor = DroneColors.Surface,
+                    titleContentColor = DroneColors.Cyan,
                 ),
             )
         },
+        containerColor = DroneColors.Background,
         modifier = modifier,
     ) { innerPadding ->
         Column(
@@ -80,168 +97,562 @@ fun DroneDetailScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            val drone = state.drone
-            if (drone == null) {
-                Spacer(modifier = Modifier.height(32.dp))
-                Text(
-                    text = "Дрон не найден или удалён",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.error,
+            when (state) {
+                DroneDetailUiState.Loading -> LoadingBox()
+                is DroneDetailUiState.Content -> ContentBox(
+                    drone = state.drone,
+                    telemetry = state.telemetry,
+                    credits = state.credits,
+                    soundManager = soundManager,
+                    onRename = onRename,
+                    onSetBase = onSetBase,
+                    onCollectData = onCollectData,
+                    onTransmitData = onTransmitData,
+                    onHibernate = onHibernate,
+                    onReset = onReset,
+                    onStartMission = onStartMission,
+                    onUpgradeBattery = onUpgradeBattery,
+                    onUpgradeCargo = onUpgradeCargo,
+                    onUpgradeCooling = onUpgradeCooling,
+                    onDelete = onDelete,
                 )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = onBack) {
-                    Text("Вернуться к списку")
-                }
-            } else {
-                val (cardColor, statusText, statusColor) = when (drone.status) {
-                    Drone.Status.NORMAL -> Triple(MaterialTheme.colorScheme.surfaceVariant, "Системы в норме", MaterialTheme.colorScheme.onSurfaceVariant)
-                    Drone.Status.OVERHEATED -> Triple(Color(0xFFFFCDD2), "КРИТИЧЕСКИЙ ПЕРЕГРЕВ", Color.Red)
-                    Drone.Status.DEPLETED -> Triple(Color(0xFFFFF9C4), "НИЗКИЙ ЗАРЯД", Color(0xFFE65100))
-                    Drone.Status.FULL_CARGO -> Triple(Color(0xFFC8E6C9), "ХРАНИЛИЩЕ ПЕРЕПОЛНЕНО", Color(0xFF2E7D32))
-                }
+                DroneDetailUiState.NotFound -> NotFoundBox(onBack)
+                is DroneDetailUiState.Error -> ErrorBox(state.canRetry, state.message, onRetry)
+            }
+        }
+    }
+}
 
-                var isEditingName by remember { mutableStateOf(value = false) }
-                var nameInput by remember(drone.name) { mutableStateOf(drone.name) }
+@Composable
+private fun LoadingBox() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        CircularProgressIndicator(color = DroneColors.Cyan)
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Установка сетевого соединения с дроном...",
+            color = DroneColors.Cyan,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
 
-                Card(
+@Composable
+private fun ContentBox(
+    drone: Drone,
+    telemetry: DroneTelemetryDto,
+    credits: Int,
+    soundManager: SoundManager,
+    onRename: (String) -> Unit,
+    onSetBase: (String) -> Unit,
+    onCollectData: () -> Unit,
+    onTransmitData: () -> Unit,
+    onHibernate: () -> Unit,
+    onReset: () -> Unit,
+    onStartMission: (Int) -> Unit,
+    onUpgradeBattery: () -> Unit,
+    onUpgradeCargo: () -> Unit,
+    onUpgradeCooling: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val style = drone.status.style()
+    val currentBase = baseFor(drone.baseCity)
+    val weatherDesc = weatherDescription(telemetry.weather.weatherCode)
+
+    var isEditingName by remember { mutableStateOf(value = false) }
+    var nameInput by remember(drone.name) { mutableStateOf(drone.name) }
+    var showResetConfirmDialog by remember { mutableStateOf(value = false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(value = false) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = style.cardColor),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = drone.rankName,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = DroneColors.Cyan,
+                )
+                Text(
+                    text = "Кредиты: $credits ⚡",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = DroneColors.Good,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            DroneImage(
+                status = drone.status,
+                modifier = Modifier
+                    .size(100.dp)
+                    .padding(bottom = 12.dp),
+            )
+
+            if (isEditingName) {
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = cardColor),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                    OutlinedTextField(
+                        value = nameInput,
+                        onValueChange = { nameInput = it },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        label = { Text("Имя дрона", color = DroneColors.Cyan) },
+                    )
+                    Button(
+                        onClick = {
+                            soundManager.play(SoundManager.Effect.CLICK)
+                            onRename(nameInput)
+                            isEditingName = false
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
                     ) {
-                        DroneImage(
-                            status = drone.status,
-                            modifier = Modifier
-                                .size(100.dp)
-                                .padding(bottom = 12.dp),
-                        )
-
-                        if (isEditingName) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                OutlinedTextField(
-                                    value = nameInput,
-                                    onValueChange = { nameInput = it },
-                                    modifier = Modifier.weight(1f),
-                                    singleLine = true,
-                                    label = { Text("Имя дрона") },
-                                )
-                                Button(
-                                    onClick = {
-                                        onRename(nameInput)
-                                        isEditingName = false
-                                    },
-                                ) {
-                                    Text("ОК")
-                                }
-                            }
-                        } else {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center,
-                            ) {
-                                Text(
-                                    text = drone.name,
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                                OutlinedButton(
-                                    onClick = { isEditingName = true },
-                                    modifier = Modifier.padding(start = 8.dp),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                ) {
-                                    Text("Переименовать", fontSize = 11.sp)
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            StatusImage(
-                                status = drone.status,
-                                modifier = Modifier
-                                    .size(22.dp)
-                                    .padding(end = 6.dp),
-                            )
-                            Text(
-                                text = statusText,
-                                fontWeight = FontWeight.Bold,
-                                color = statusColor,
-                                fontSize = 16.sp,
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(24.dp))
-
-                        DetailMetricBar("Заряд батареи", drone.battery, "%", Color.Blue)
-                        DetailMetricBar("Заполненность памяти", drone.cargo, "%", Color.DarkGray)
-                        DetailMetricBar(
-                            "Температура ядра",
-                            drone.temperature,
-                            "°C",
-                            if (drone.temperature >= 80) Color.Red else Color.Unspecified,
-                        )
+                        Text("ОК", fontWeight = FontWeight.Bold)
                     }
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Button(
-                    onClick = onCollectData,
-                    enabled = drone.canCollectData,
-                    modifier = Modifier.fillMaxWidth(),
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text("Собрать данные окружения")
+                    Text(
+                        text = drone.name,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedButton(
+                        onClick = {
+                            soundManager.play(SoundManager.Effect.CLICK)
+                            isEditingName = true
+                        },
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Cyan),
+                    ) {
+                        Text("Переименовать", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StatusImage(
+                    status = drone.status,
+                    modifier = Modifier
+                        .size(22.dp)
+                        .padding(end = 6.dp),
+                )
+                Text(
+                    text = style.text,
+                    fontWeight = FontWeight.Bold,
+                    color = style.accent,
+                    fontSize = 15.sp,
+                )
+            }
+
+            if (drone.status == Drone.Status.ON_MISSION) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Выполняется полёт: еще ${drone.activeMissionRemaining} сек",
+                    color = DroneColors.Cyan,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                LinearProgressIndicator(
+                    progress = { 1f - (drone.activeMissionRemaining.toFloat() / drone.activeMissionDuration) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .padding(top = 4.dp),
+                    color = DroneColors.Cyan,
+                    trackColor = DroneColors.SurfaceAlt,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            DetailMetricBar("Заряд батареи", drone.battery, "% (макс ${drone.maxBattery}%)", DroneColors.Cyan)
+            DetailMetricBar("Заполненность памяти", drone.cargo, "% (макс ${drone.maxCargo}%)", DroneColors.Pink)
+            DetailMetricBar(
+                "Температура ядра",
+                drone.temperature,
+                "°C (нагрев +${drone.heatRate}°C)",
+                if (drone.temperature >= 80) DroneColors.Danger else DroneColors.Good,
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Селектор базы города дислокации
+            Text(
+                text = "Выбор базы дислокации дрона:",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = DroneColors.Cyan,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp),
+            )
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                items(ALL_BASES) { b ->
+                    val isSelected = b.city.equals(drone.baseCity, ignoreCase = true)
+                    Button(
+                        onClick = {
+                            soundManager.play(SoundManager.Effect.CLICK)
+                            onSetBase(b.city)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isSelected) DroneColors.Cyan else DroneColors.SurfaceAlt,
+                            contentColor = if (isSelected) Color.Black else Color.White,
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    ) {
+                        Text(b.city, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = DroneColors.SurfaceAlt),
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Сетевая телеметрия:",
+                            fontWeight = FontWeight.Bold,
+                            color = DroneColors.Cyan,
+                            fontSize = 13.sp,
+                        )
+                        Text(
+                            text = if (telemetry.isOnlineData) "🌐 Open-Meteo (Онлайн)" else "📡 Кэш / Assets (Офлайн)",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (telemetry.isOnlineData) DroneColors.Good else Color(0xFFFF9100),
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("База: ${currentBase.city} (${currentBase.latitude}, ${currentBase.longitude})", color = Color.White, fontSize = 12.sp)
+                    Text("Погода: $weatherDesc, ветер ${telemetry.weather.windSpeed} м/с", color = Color.White, fontSize = 12.sp)
+                    Text("Модель: ${telemetry.model}", color = Color.White, fontSize = 12.sp)
+                    Text("Прошивка: ${telemetry.firmware}", color = Color.White, fontSize = 12.sp)
+                    Text("Дальность: ${telemetry.rangeKm} км", color = Color.White, fontSize = 12.sp)
+                    Text("Сенсоры: ${telemetry.sensorType}", color = Color.White, fontSize = 12.sp)
+                    Text(telemetry.notes, color = DroneColors.Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                }
+            }
+        }
+    }
+
+    Spacer(modifier = Modifier.height(20.dp))
+
+    // Секция вылета на миссии
+    Text(
+        text = "Разведывательные вылеты (заправка ⚡):",
+        fontWeight = FontWeight.Bold,
+        color = DroneColors.Cyan,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 6.dp),
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        val cost15 = drone.missionLaunchCost(15)
+        val cost30 = drone.missionLaunchCost(30)
+        val cost60 = drone.missionLaunchCost(60)
+
+        Button(
+            onClick = {
+                soundManager.play(SoundManager.Effect.SUCCESS)
+                onStartMission(15)
+            },
+            enabled = drone.canStartMission(15, credits),
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
+            contentPadding = PaddingValues(4.dp),
+        ) {
+            Text("15с (-${cost15}⚡)", fontWeight = FontWeight.Bold, fontSize = 10.sp)
+        }
+        Button(
+            onClick = {
+                soundManager.play(SoundManager.Effect.SUCCESS)
+                onStartMission(30)
+            },
+            enabled = drone.canStartMission(30, credits),
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
+            contentPadding = PaddingValues(4.dp),
+        ) {
+            Text("30с (-${cost30}⚡)", fontWeight = FontWeight.Bold, fontSize = 10.sp)
+        }
+        Button(
+            onClick = {
+                soundManager.play(SoundManager.Effect.SUCCESS)
+                onStartMission(60)
+            },
+            enabled = drone.canStartMission(60, credits),
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Pink, contentColor = Color.White),
+            contentPadding = PaddingValues(4.dp),
+        ) {
+            Text("60с (-${cost60}⚡)", fontWeight = FontWeight.Bold, fontSize = 10.sp)
+        }
+    }
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    // Секция Апгрейдов (Батарея, Память, Охлаждение)
+    Text(
+        text = "Улучшения (Ранг ${drone.rankLevel}, цена ${drone.upgradeCost}⚡):",
+        fontWeight = FontWeight.Bold,
+        color = DroneColors.Pink,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 6.dp),
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        OutlinedButton(
+            onClick = {
+                soundManager.play(SoundManager.Effect.SUCCESS)
+                onUpgradeBattery()
+            },
+            enabled = credits >= drone.upgradeCost,
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Cyan),
+            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+        ) {
+            Text("+${drone.batteryBoostAmount}% Заряд", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+        OutlinedButton(
+            onClick = {
+                soundManager.play(SoundManager.Effect.SUCCESS)
+                onUpgradeCargo()
+            },
+            enabled = credits >= drone.upgradeCost,
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Good),
+            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+        ) {
+            Text("+${drone.cargoBoostAmount}% Память", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+        OutlinedButton(
+            onClick = {
+                soundManager.play(SoundManager.Effect.SUCCESS)
+                onUpgradeCooling()
+            },
+            enabled = (credits >= drone.upgradeCost) && (drone.heatRate > 5),
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Pink),
+            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+        ) {
+            Text("-${drone.coolingBoostAmount}°C Нагрев", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+
+    Spacer(modifier = Modifier.height(16.dp))
+
+    Button(
+        onClick = {
+            soundManager.play(SoundManager.Effect.CLICK)
+            onCollectData()
+        },
+        enabled = drone.canCollectData,
+        modifier = Modifier.fillMaxWidth(),
+        colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
+    ) {
+        Text("Собрать данные окружения", fontWeight = FontWeight.Bold)
+    }
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    Button(
+        onClick = {
+            soundManager.play(SoundManager.Effect.SUCCESS)
+            onTransmitData()
+        },
+        enabled = drone.canTransmitData,
+        modifier = Modifier.fillMaxWidth(),
+        colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Pink, contentColor = Color.White),
+    ) {
+        Text("Передать данные на базу", fontWeight = FontWeight.Bold)
+    }
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    Button(
+        onClick = {
+            soundManager.play(SoundManager.Effect.SUCCESS)
+            onHibernate()
+        },
+        enabled = drone.canHibernate,
+        modifier = Modifier.fillMaxWidth(),
+        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3), contentColor = Color.White),
+    ) {
+        Text("Гибернация (зарядка и охлаждение)", fontWeight = FontWeight.Bold)
+    }
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    OutlinedButton(
+        onClick = {
+            soundManager.play(SoundManager.Effect.WARNING)
+            showResetConfirmDialog = true
+        },
+        modifier = Modifier.fillMaxWidth(),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Cyan),
+    ) {
+        Text("Сброс до заводских настроек")
+    }
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    OutlinedButton(
+        onClick = {
+            soundManager.play(SoundManager.Effect.DELETE)
+            showDeleteConfirmDialog = true
+        },
+        modifier = Modifier.fillMaxWidth(),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Danger),
+    ) {
+        Text("Списать (удалить дрон)")
+    }
+
+    // Диалог подтверждения СБРОСА
+    if (showResetConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirmDialog = false },
+            title = { Text("Подтверждение сброса", color = DroneColors.Cyan, fontWeight = FontWeight.Bold) },
+            text = { Text("Вы действительно хотите сбросить все параметры дрона '${drone.name}' до заводских настроек?", color = Color.White) },
+            confirmButton = {
                 Button(
-                    onClick = onTransmitData,
-                    enabled = drone.canTransmitData,
-                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        soundManager.play(SoundManager.Effect.WARNING)
+                        onReset()
+                        showResetConfirmDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
                 ) {
-                    Text("Передать данные на базу")
+                    Text("Сбросить", fontWeight = FontWeight.Bold)
                 }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Button(
-                    onClick = onHibernate,
-                    enabled = drone.canHibernate,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Гибернация (зарядка и охлаждение)")
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
+            },
+            dismissButton = {
                 OutlinedButton(
-                    onClick = onReset,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Blue),
+                    onClick = { showResetConfirmDialog = false },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Muted),
                 ) {
-                    Text("Сброс до заводских настроек")
+                    Text("Отмена")
                 }
+            },
+            containerColor = DroneColors.Surface,
+        )
+    }
 
-                Spacer(modifier = Modifier.height(8.dp))
-
+    // Диалог подтверждения СПИСАНИЯ/УДАЛЕНИЯ
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            title = { Text("Списание дрона", color = DroneColors.Danger, fontWeight = FontWeight.Bold) },
+            text = { Text("Вы действительно хотите списать и удалить дрон '${drone.name}' из флота?", color = Color.White) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        soundManager.play(SoundManager.Effect.DELETE)
+                        onDelete()
+                        showDeleteConfirmDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Danger, contentColor = Color.White),
+                ) {
+                    Text("Списать", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
                 OutlinedButton(
-                    onClick = onDelete,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red),
+                    onClick = { showDeleteConfirmDialog = false },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Muted),
                 ) {
-                    Text("Списать (удалить дрон)")
+                    Text("Отмена")
                 }
+            },
+            containerColor = DroneColors.Surface,
+        )
+    }
+}
+
+@Composable
+private fun NotFoundBox(onBack: () -> Unit) {
+    Column(
+        modifier = Modifier.padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = "Дрон не найден или списан",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = DroneColors.Danger,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black)) {
+            Text("Вернуться к списку", fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun ErrorBox(canRetry: Boolean, message: String, onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier.padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.titleMedium,
+            color = DroneColors.Danger,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        if (canRetry) {
+            Button(
+                onClick = onRetry,
+                colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
+            ) {
+                Text("Повторить загрузку", fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -254,32 +665,16 @@ fun DetailMetricBar(label: String, value: Int, unit: String, color: Color) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(label, fontSize = 14.sp)
-            Text("$value$unit", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = color)
+            Text(label, fontSize = 13.sp, color = Color(0xFFC9D1D9))
+            Text("$value$unit", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = color)
         }
         LinearProgressIndicator(
             progress = { value / 100f },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(8.dp),
-            color = if (color == Color.Unspecified) MaterialTheme.colorScheme.primary else color,
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun DroneDetailScreenPreview() {
-    MaterialTheme {
-        DroneDetailScreen(
-            state = DroneDetailUiState(drone = startDrones().first()),
-            onRename = {},
-            onCollectData = {},
-            onTransmitData = {},
-            onHibernate = {},
-            onReset = {},
-            onDelete = {},
-            onBack = {},
+            color = if (color == Color.Unspecified) DroneColors.Cyan else color,
+            trackColor = DroneColors.SurfaceAlt,
         )
     }
 }

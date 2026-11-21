@@ -33,8 +33,14 @@ fun DroneNavigation(repo: DroneRepository, modifier: Modifier = Modifier) {
                 val viewModel = viewModel { DroneListViewModel(repo) }
                 DroneListScreen(
                     state = viewModel.uiState,
+                    onSearchQueryChange = viewModel::onSearchQueryChange,
+                    onFilterChange = viewModel::onFilterChange,
                     onAddDrone = viewModel::onAddDrone,
                     onDeleteDrone = viewModel::onDeleteDrone,
+                    onRestoreDeletedDrone = viewModel::onRestoreDeletedDrone,
+                    onDismissMissionNotice = viewModel::onDismissMissionNotice,
+                    onHibernateAll = viewModel::onHibernateAll,
+                    onTransmitAll = viewModel::onTransmitAll,
                     onSelectDrone = { id ->
                         if (backStack.lastOrNull() == DroneListKey) {
                             backStack.add(DroneDetailKey(id))
@@ -51,11 +57,17 @@ fun DroneNavigation(repo: DroneRepository, modifier: Modifier = Modifier) {
                 }
                 DroneDetailScreen(
                     state = viewModel.uiState,
+                    onRetry = viewModel::onRetry,
                     onRename = viewModel::onRename,
+                    onSetBase = viewModel::onSetBase,
                     onCollectData = viewModel::onCollectData,
                     onTransmitData = viewModel::onTransmitData,
                     onHibernate = viewModel::onHibernate,
                     onReset = viewModel::onReset,
+                    onStartMission = viewModel::onStartMission,
+                    onUpgradeBattery = viewModel::onUpgradeBattery,
+                    onUpgradeCargo = viewModel::onUpgradeCargo,
+                    onUpgradeCooling = viewModel::onUpgradeCooling,
                     onDelete = {
                         viewModel.onDelete()
                         close()
