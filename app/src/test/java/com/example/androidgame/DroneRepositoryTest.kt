@@ -46,6 +46,13 @@ class DroneRepositoryTest {
     }
 
     @Test
+    fun deleteAllDrones_preservesEmptyList() {
+        val allIds = repo.drones.map { it.id }
+        allIds.forEach { repo.deleteDrone(it) }
+        assertEquals(0, repo.drones.size)
+    }
+
+    @Test
     fun renameDrone_updatesDroneName() {
         val targetId = repo.drones.first().id
         val newName = "Флагман X-99"
@@ -54,7 +61,9 @@ class DroneRepositoryTest {
 
         val updated = repo.drone(targetId)
         assertNotNull(updated)
-        assertEquals(newName, updated!!.name)
+        if (updated != null) {
+            assertEquals(newName, updated.name)
+        }
     }
 
     @Test
@@ -69,9 +78,11 @@ class DroneRepositoryTest {
 
         val targetAfter = repo.drone(targetId)
         assertNotNull(targetAfter)
-        assertEquals(25, targetAfter!!.cargo)
-        assertEquals(85, targetAfter.battery)
-        assertEquals(35, targetAfter.temperature)
+        if (targetAfter != null) {
+            assertEquals(25, targetAfter.cargo)
+            assertEquals(85, targetAfter.battery)
+            assertEquals(35, targetAfter.temperature)
+        }
 
         val otherDroneAfter = repo.drone(otherDroneBefore.id)
         assertEquals(otherDroneBefore, otherDroneAfter)
@@ -91,8 +102,10 @@ class DroneRepositoryTest {
 
         val drone = repo.drone(targetId)
         assertNotNull(drone)
-        assertEquals(10, drone!!.battery)
-        assertEquals(Drone.Status.DEPLETED, drone.status)
+        if (drone != null) {
+            assertEquals(10, drone.battery)
+            assertEquals(Drone.Status.DEPLETED, drone.status)
+        }
     }
 
     @Test
@@ -105,8 +118,10 @@ class DroneRepositoryTest {
 
         val targetAfter = repo.drone(targetId)
         assertNotNull(targetAfter)
-        assertEquals(100, targetAfter!!.battery)
-        assertEquals(0, targetAfter.cargo)
-        assertEquals(20, targetAfter.temperature)
+        if (targetAfter != null) {
+            assertEquals(100, targetAfter.battery)
+            assertEquals(0, targetAfter.cargo)
+            assertEquals(20, targetAfter.temperature)
+        }
     }
 }

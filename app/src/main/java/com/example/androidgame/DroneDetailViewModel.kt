@@ -9,6 +9,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.seconds
 
 sealed interface DroneDetailUiState {
     data object Loading : DroneDetailUiState
@@ -35,9 +36,7 @@ class DroneDetailViewModel(
         load()
         viewModelScope.launch {
             while (isActive) {
-                delay(1000L)
-                val isStormy = (uiState as? DroneDetailUiState.Content)?.telemetry?.weather?.isStormy ?: false
-                repo.tickMissions(isStormy)
+                delay(1.seconds)
                 refreshState()
             }
         }

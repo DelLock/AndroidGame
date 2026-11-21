@@ -7,7 +7,6 @@ import android.net.NetworkCapabilities
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/** Следит за интернетом телефона. Нужен для индикатора "Онлайн / Нет сети". */
 class ConnectivityMonitor(context: Context) {
     private val cm = context.getSystemService(ConnectivityManager::class.java)
 
@@ -31,8 +30,7 @@ class ConnectivityMonitor(context: Context) {
     init {
         try {
             cm?.registerDefaultNetworkCallback(callback)
-        } catch (_: SecurityException) {
-            // нет разрешения ACCESS_NETWORK_STATE — индикатор просто останется "онлайн"
+        } catch (_: Exception) {
             _online.value = true
         }
     }
@@ -42,12 +40,11 @@ class ConnectivityMonitor(context: Context) {
         return try {
             val caps = manager.getNetworkCapabilities(manager.activeNetwork)
             (caps != null) && hasInternet(caps)
-        } catch (_: SecurityException) {
+        } catch (_: Exception) {
             true
         }
     }
 
     private fun hasInternet(caps: NetworkCapabilities): Boolean =
-        caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
 }

@@ -4,10 +4,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 
 enum class DroneFilter { ALL, NORMAL, ON_MISSION, OVERHEATED, DEPLETED, FULL_CARGO }
 
@@ -51,15 +47,6 @@ class DroneListViewModel(private val repo: DroneRepository) : ViewModel() {
                 missionNoticeMessage = repo.lastCompletedMissionMessage,
             )
         }
-
-    init {
-        viewModelScope.launch {
-            while (isActive) {
-                delay(1000L)
-                repo.tickMissions()
-            }
-        }
-    }
 
     fun onSearchQueryChange(newQuery: String) {
         searchQuery = newQuery

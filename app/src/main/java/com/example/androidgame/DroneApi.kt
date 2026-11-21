@@ -3,7 +3,12 @@ package com.example.androidgame
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import retrofit2.http.GET
-import retrofit2.http.Path
+import retrofit2.http.Query
+
+@Serializable
+data class OpenMeteoResponseDto(
+    @SerialName("current_weather") val currentWeather: CurrentWeatherDto = CurrentWeatherDto()
+)
 
 @Serializable
 data class DroneTelemetryDto(
@@ -13,9 +18,14 @@ data class DroneTelemetryDto(
     @SerialName("sensor_type") val sensorType: String = "LiDAR / Quantum Optical",
     val weather: CurrentWeatherDto = CurrentWeatherDto(),
     val notes: String = "Спецификация телеметрии успешно загружена по сети с сервера штаба.",
+    val isOnlineData: Boolean = true,
 )
 
-interface DroneApi {
-    @GET("telemetry-{id}.json")
-    suspend fun getTelemetry(@Path("id") id: Int): DroneTelemetryDto
+interface OpenMeteoApi {
+    @GET("v1/forecast")
+    suspend fun getWeather(
+        @Query("latitude") latitude: Double,
+        @Query("longitude") longitude: Double,
+        @Query("current_weather") currentWeather: Boolean = true,
+    ): OpenMeteoResponseDto
 }

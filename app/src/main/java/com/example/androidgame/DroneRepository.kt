@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CancellationException
@@ -11,16 +12,18 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import retrofit2.HttpException
 import java.io.IOException
+import kotlin.time.Duration.Companion.seconds
 
 class DroneRepository(
     private val context: Context? = null,
-    private val api: DroneApi? = null,
+    private val openMeteoApi: OpenMeteoApi? = null,
 ) {
     private val scope = CoroutineScope(Dispatchers.Default)
     private val json = Json { ignoreUnknownKeys = true }
@@ -44,6 +47,7 @@ class DroneRepository(
     var missionNoticeTimerSeconds by mutableStateOf(0)
         private set
 
+    private val cityWeatherCache = mutableStateMapOf<String, CurrentWeatherDto>()
     private val unhandledCompletedMissions = mutableListOf<String>()
     private var totalPendingReward = 0
 
@@ -52,14 +56,22 @@ class DroneRepository(
     private var nextId = (drones.maxOfOrNull { it.id } ?: 0) + 1
     private var lastTickTimestamp = 0L
 
+    init {
+        scope.launch {
+            while (isActive) {
+                delay(1.seconds)
+                tickMissions()
+            }
+        }
+    }
+
     fun drone(id: Int): Drone? = drones.find { it.id == id }
 
     private fun loadSavedDrones(): List<Drone> {
-        val savedJson = prefs?.getString("saved_drones_list", null)
-        if (!savedJson.isNullOrBlank()) {
+        if ((prefs != null) && prefs.contains("saved_drones_list")) {
+            val savedJson = prefs.getString("saved_drones_list", "") ?: ""
             try {
-                val list = json.decodeFromString<List<Drone>>(savedJson)
-                if (list.isNotEmpty()) return list
+                return json.decodeFromString<List<Drone>>(savedJson)
             } catch (e: Exception) {
                 Log.e("DroneRepository", "Ошибка загрузки сохраненных дронов", e)
             }
@@ -82,14 +94,22 @@ class DroneRepository(
 
     suspend fun fetchTelemetry(id: Int): DroneTelemetryDto {
         val target = drone(id) ?: throw DroneNotFoundException()
+        val base = baseFor(target.baseCity)
 
-        if (api != null) {
+        var weather = CurrentWeatherDto()
+        var isOnline = false
+
+        if (openMeteoApi != null) {
             try {
-                return retryIO { api.getTelemetry(id) }
+                val response = retryIO { openMeteoApi.getWeather(base.latitude, base.longitude) }
+                weather = response.currentWeather
+                cityWeatherCache[base.city] = weather
+                isOnline = true
             } catch (e: CancellationException) {
                 throw e
             } catch (_: IOException) {
-                // Если нет сети, выводим локальную телеметрию из assets
+                weather = cityWeatherCache[base.city] ?: CurrentWeatherDto()
+                isOnline = false
             } catch (e: HttpException) {
                 if (e.code() == 404) throw DroneNotFoundException()
                 throw DroneNetworkException(canRetry = e.code() >= 500, cause = e)
@@ -97,36 +117,35 @@ class DroneRepository(
                 Log.e("DroneRepository", "Ошибка десериализации ответа сервера для дрона $id", e)
                 throw DroneNetworkException(canRetry = false, cause = e)
             }
-        }
-
-        if (context != null) {
-            return withContext(Dispatchers.IO) {
-                try {
+        } else if (context != null) {
+            try {
+                withContext(Dispatchers.IO) {
                     val assetPath = "api-data/telemetry-$id.json"
                     context.assets.open(assetPath).use { stream ->
                         val jsonString = stream.bufferedReader().readText()
-                        json.decodeFromString<DroneTelemetryDto>(jsonString)
+                        val assetTelemetry = json.decodeFromString<DroneTelemetryDto>(jsonString)
+                        weather = assetTelemetry.weather
                     }
-                } catch (_: IOException) {
-                    DroneTelemetryDto(
-                        model = "CyberScout ${target.name}",
-                        firmware = "v3.12.8-cyber",
-                        rangeKm = 100 + (target.id * 10),
-                        sensorType = "LiDAR / Thermal Array",
-                        notes = "Спецификация телеметрии штаба для дрона №$id.",
-                    )
-                } catch (e: SerializationException) {
-                    throw DroneNetworkException(canRetry = false, cause = e)
                 }
+            } catch (_: IOException) {
+                weather = CurrentWeatherDto()
             }
+        }
+
+        val noteText = if (isOnline) {
+            "Прямой поток метеоданных успешно получен по сети с Open-Meteo API (${base.city})."
+        } else {
+            "Сеть недоступна. Отображается локальная оффлайн-спецификация из кэша."
         }
 
         return DroneTelemetryDto(
             model = "CyberScout ${target.name}",
-            firmware = "v3.12.8-cyber",
+            firmware = if (isOnline) "v3.12.8-cyber-LIVE" else "v3.12.8-cyber-OFFLINE",
             rangeKm = 100 + (target.id * 10),
-            sensorType = "LiDAR / Thermal Array",
-            notes = "Спецификация телеметрии штаба для дрона №$id.",
+            sensorType = if (isOnline) "LiDAR / Quantum Optical (Онлайн)" else "LiDAR (Локальный режим)",
+            weather = weather,
+            notes = noteText,
+            isOnlineData = isOnline,
         )
     }
 
@@ -157,7 +176,7 @@ class DroneRepository(
         undoJob?.cancel()
         undoJob = scope.launch {
             while (undoTimerSeconds > 0) {
-                delay(1000L)
+                delay(1.seconds)
                 undoTimerSeconds--
             }
             lastDeletedDrone = null
@@ -173,12 +192,6 @@ class DroneRepository(
         lastDeletedDrone = null
         undoTimerSeconds = 0
         persistState()
-    }
-
-    fun clearLastDeletedDrone() {
-        undoJob?.cancel()
-        lastDeletedDrone = null
-        undoTimerSeconds = 0
     }
 
     fun clearMissionNotice() {
@@ -204,7 +217,7 @@ class DroneRepository(
         missionNoticeJob?.cancel()
         missionNoticeJob = scope.launch {
             while (missionNoticeTimerSeconds > 0) {
-                delay(1000L)
+                delay(1.seconds)
                 missionNoticeTimerSeconds--
             }
             clearMissionNotice()
@@ -319,7 +332,7 @@ class DroneRepository(
         updateDrone(updated)
     }
 
-    fun tickMissions(isStormyWeather: Boolean = false) {
+    fun tickMissions() {
         val now = System.currentTimeMillis()
         if ((now - lastTickTimestamp) < 900L) return
         lastTickTimestamp = now
@@ -329,8 +342,9 @@ class DroneRepository(
             if (drone.activeMissionRemaining > 0) {
                 stateChanged = true
                 val newRemaining = drone.activeMissionRemaining - 1
+                val isCityStormy = cityWeatherCache[drone.baseCity]?.isStormy ?: false
 
-                if (isStormyWeather && (drone.activeMissionDuration >= 30) && (newRemaining == (drone.activeMissionDuration / 2))) {
+                if (isCityStormy && (drone.activeMissionDuration >= 30) && (newRemaining == (drone.activeMissionDuration / 2))) {
                     triggerMissionNotice(drone.name, 0, 0)
                     drone.copy(
                         activeMissionDuration = 0,

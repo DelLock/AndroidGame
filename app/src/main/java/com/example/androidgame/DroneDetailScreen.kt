@@ -345,12 +345,25 @@ private fun ContentBox(
                 colors = CardDefaults.cardColors(containerColor = DroneColors.SurfaceAlt),
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = "Сетевая телеметрия и база:",
-                        fontWeight = FontWeight.Bold,
-                        color = DroneColors.Cyan,
-                        fontSize = 13.sp,
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Сетевая телеметрия:",
+                            fontWeight = FontWeight.Bold,
+                            color = DroneColors.Cyan,
+                            fontSize = 13.sp,
+                        )
+                        Text(
+                            text = if (telemetry.isOnlineData) "🌐 Open-Meteo (Онлайн)" else "📡 Кэш / Assets (Офлайн)",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (telemetry.isOnlineData) DroneColors.Good else Color(0xFFFF9100),
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text("База: ${currentBase.city} (${currentBase.latitude}, ${currentBase.longitude})", color = Color.White, fontSize = 12.sp)
                     Text("Погода: $weatherDesc, ветер ${telemetry.weather.windSpeed} м/с", color = Color.White, fontSize = 12.sp)
                     Text("Модель: ${telemetry.model}", color = Color.White, fontSize = 12.sp)
@@ -636,7 +649,7 @@ private fun ErrorBox(canRetry: Boolean, onRetry: () -> Unit) {
         Spacer(modifier = Modifier.height(16.dp))
         if (canRetry) {
             Button(
-                onClick = onRetry,
+                onClick = { onRetry() },
                 colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
             ) {
                 Text("Повторить загрузку", fontWeight = FontWeight.Bold)

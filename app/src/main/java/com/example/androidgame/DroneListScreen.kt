@@ -58,16 +58,16 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun DroneListScreen(
     state: DroneListUiState,
-    onSearchQueryChange: (String) -> Unit = {},
-    onFilterChange: (DroneFilter) -> Unit = {},
     onAddDrone: (String?) -> Unit,
     onDeleteDrone: (Int) -> Unit,
+    onSelectDrone: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    onSearchQueryChange: (String) -> Unit = {},
+    onFilterChange: (DroneFilter) -> Unit = {},
     onRestoreDeletedDrone: () -> Unit = {},
     onDismissMissionNotice: () -> Unit = {},
     onHibernateAll: () -> Unit = {},
     onTransmitAll: () -> Unit = {},
-    onSelectDrone: (Int) -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val monitor = remember(context) { ConnectivityMonitor(context) }
@@ -429,6 +429,7 @@ fun DroneItemCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val (cardColor, _, _) = drone.status.style()
     val style = drone.status.style()
 
     Card(
@@ -436,7 +437,7 @@ fun DroneItemCard(
             .fillMaxWidth()
             .clickable(onClick = onSelect),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = style.cardColor),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
     ) {
         Row(
