@@ -130,6 +130,7 @@ class DroneRepository(
         try {
             val response = retryIO { openMeteoApi.getWeather(base.latitude, base.longitude) }
             cityWeatherCache[base.city] = response.currentWeather
+            persistState()
             return DroneTelemetryDto(
                 model = "CyberScout ${target.name}",
                 firmware = "v3.12.8-cyber-LIVE",
@@ -142,17 +143,53 @@ class DroneRepository(
         } catch (e: CancellationException) {
             throw e
         } catch (_: IOException) {
+            val cached = cityWeatherCache[base.city]
+            if (cached != null) {
+                return DroneTelemetryDto(
+                    model = "CyberScout ${target.name}",
+                    firmware = "v3.12.8-cyber-OFFLINE",
+                    rangeKm = 100 + (target.id * 10),
+                    sensorType = "LiDAR (из кэша)",
+                    weather = cached,
+                    notes = "Сеть недоступна. Показаны последние известные метеоданные из кэша (${base.city}).",
+                    isOnlineData = false,
+                )
+            }
             throw DroneNetworkException(canRetry = true)
         } catch (e: HttpException) {
             if (e.code() == 404) {
                 throw DroneNotFoundException()
             } else if (e.code() >= 500) {
+                val cached = cityWeatherCache[base.city]
+                if (cached != null) {
+                    return DroneTelemetryDto(
+                        model = "CyberScout ${target.name}",
+                        firmware = "v3.12.8-cyber-OFFLINE",
+                        rangeKm = 100 + (target.id * 10),
+                        sensorType = "LiDAR (из кэша)",
+                        weather = cached,
+                        notes = "Ошибка сервера. Показаны последние известные метеоданные из кэша.",
+                        isOnlineData = false,
+                    )
+                }
                 throw DroneNetworkException(canRetry = true, cause = e)
             } else {
                 throw DroneNetworkException(canRetry = false, cause = e)
             }
         } catch (e: SerializationException) {
             Log.e("DroneRepository", "Ошибка десериализации ответа сервера для дрона $id", e)
+            val cached = cityWeatherCache[base.city]
+            if (cached != null) {
+                return DroneTelemetryDto(
+                    model = "CyberScout ${target.name}",
+                    firmware = "v3.12.8-cyber-OFFLINE",
+                    rangeKm = 100 + (target.id * 10),
+                    sensorType = "LiDAR (из кэша)",
+                    weather = cached,
+                    notes = "Ошибка десериализации. Показаны последние известные метеоданные из кэша.",
+                    isOnlineData = false,
+                )
+            }
             throw DroneNetworkException(canRetry = false, cause = e)
         }
     }
