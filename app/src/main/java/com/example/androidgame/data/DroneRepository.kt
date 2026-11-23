@@ -31,13 +31,15 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import retrofit2.HttpException
 import java.io.IOException
+import kotlin.coroutines.CoroutineContext
 import kotlin.time.Duration.Companion.seconds
 
 class DroneRepository(
     private val openMeteoApi: OpenMeteoApi,
     private val context: Context? = null,
+    mainContext: CoroutineContext = Dispatchers.Main.immediate,
 ) {
-    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val scope = CoroutineScope(mainContext + SupervisorJob())
     private val json = Json { ignoreUnknownKeys = true }
     private val prefs: SharedPreferences? = context?.getSharedPreferences("drone_hub_storage", Context.MODE_PRIVATE)
 

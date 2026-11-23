@@ -5,6 +5,7 @@ import com.example.androidgame.data.api.OpenMeteoApi
 import com.example.androidgame.data.api.dto.CurrentWeatherDto
 import com.example.androidgame.data.api.dto.OpenMeteoResponseDto
 import com.example.androidgame.domain.model.Drone
+import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -28,7 +29,10 @@ class DroneRepositoryTest {
 
     @Before
     fun setUp() {
-        repo = DroneRepository(openMeteoApi = FakeOpenMeteoApi())
+        repo = DroneRepository(
+            openMeteoApi = FakeOpenMeteoApi(),
+            mainContext = Dispatchers.Default,
+        )
     }
 
     @Test

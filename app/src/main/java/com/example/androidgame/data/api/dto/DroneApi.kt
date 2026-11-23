@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class OpenMeteoResponseDto(
-    @SerialName("current_weather") val currentWeather: CurrentWeatherDto = CurrentWeatherDto(20.0, 5.0, 0)
+    @SerialName("current_weather") val currentWeather: CurrentWeatherDto
 )
 
 @Serializable
