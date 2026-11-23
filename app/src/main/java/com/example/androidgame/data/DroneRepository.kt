@@ -86,7 +86,11 @@ class DroneRepository(
         if (prefs == null || !prefs.contains("saved_drones_list")) return startDrones()
         val savedJson = prefs.getString("saved_drones_list", null) ?: return startDrones()
         return try {
-            json.decodeFromString<List<Drone>>(savedJson)
+            val list = json.decodeFromString<List<Drone>>(savedJson)
+            if (list.isEmpty()) {
+                Log.i("DroneRepository", "Список дронов пуст (все аппараты списаны).")
+            }
+            list
         } catch (e: Exception) {
             Log.e("DroneRepository", "Ошибка загрузки сохраненных дронов", e)
             startDrones()
@@ -323,6 +327,18 @@ class DroneRepository(
         val launchCost = current.missionLaunchCost(durationSeconds)
         if (!current.canStartMission(durationSeconds, credits)) return
         credits -= launchCost
+
+        if (cityWeatherCache[current.baseCity] == null) {
+            scope.launch {
+                try {
+                    val base = baseFor(current.baseCity)
+                    val response = openMeteoApi.getWeather(base.latitude, base.longitude)
+                    cityWeatherCache[base.city] = response.currentWeather
+                    persistState()
+                } catch (_: Exception) {}
+            }
+        }
+
         val batteryCost = when (durationSeconds) {
             60 -> 50
             30 -> 35

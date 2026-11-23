@@ -97,7 +97,7 @@ class DroneDetailViewModel(
     }
 
     fun onStartMission(durationSeconds: Int) {
-        repo.startMission(durationSeconds = durationSeconds, id = droneId)
+        repo.startMission(id = droneId, durationSeconds = durationSeconds)
         refreshState()
     }
 
