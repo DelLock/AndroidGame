@@ -26,7 +26,9 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -37,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -67,7 +70,7 @@ fun DroneDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Карточка дрона") },
+                title = { Text("Карточка дрона", fontWeight = FontWeight.Bold, color = DroneColors.TextPrimary) },
                 navigationIcon = {
                     OutlinedButton(
                         onClick = {
@@ -76,13 +79,13 @@ fun DroneDetailScreen(
                         },
                         modifier = Modifier.padding(start = 8.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Cyan),
+                        shape = RoundedCornerShape(12.dp),
                     ) {
-                        Text("Назад")
+                        Text("Назад", fontWeight = FontWeight.Bold)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = DroneColors.Surface,
-                    titleContentColor = DroneColors.Cyan,
                 ),
             )
         },
@@ -173,7 +176,7 @@ private fun ContentBox(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = style.cardColor),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
     ) {
         Column(
@@ -185,21 +188,33 @@ private fun ContentBox(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = drone.rankName,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = DroneColors.Cyan,
-                )
-                Text(
-                    text = "Кредиты: $credits ⚡",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = DroneColors.Good,
-                )
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = DroneColors.CyanDark,
+                ) {
+                    Text(
+                        text = drone.rankName,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = DroneColors.Cyan,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                }
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = DroneColors.GoodDark,
+                ) {
+                    Text(
+                        text = "Кредиты: $credits ⚡",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = DroneColors.Good,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             DroneImage(
                 status = drone.status,
@@ -220,6 +235,12 @@ private fun ContentBox(
                         modifier = Modifier.weight(1f),
                         singleLine = true,
                         label = { Text("Имя дрона", color = DroneColors.Cyan) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = DroneColors.Cyan,
+                            unfocusedBorderColor = DroneColors.SurfaceBorder,
+                            focusedTextColor = DroneColors.TextPrimary,
+                            unfocusedTextColor = DroneColors.TextPrimary,
+                        ),
                     )
                     Button(
                         onClick = {
@@ -227,7 +248,8 @@ private fun ContentBox(
                             onRename(nameInput)
                             isEditingName = false
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
+                        colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color(0xFF0B0F14)),
+                        shape = RoundedCornerShape(10.dp),
                     ) {
                         Text("ОК", fontWeight = FontWeight.Bold)
                     }
@@ -240,7 +262,7 @@ private fun ContentBox(
                         text = drone.name,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = DroneColors.TextPrimary,
                         textAlign = TextAlign.Center,
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -251,27 +273,36 @@ private fun ContentBox(
                         },
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Cyan),
+                        shape = RoundedCornerShape(10.dp),
                     ) {
                         Text("Переименовать", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                StatusImage(
-                    status = drone.status,
-                    modifier = Modifier
-                        .size(22.dp)
-                        .padding(end = 6.dp),
-                )
-                Text(
-                    text = style.text,
-                    fontWeight = FontWeight.Bold,
-                    color = style.accent,
-                    fontSize = 15.sp,
-                )
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = style.badgeBg,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                ) {
+                    StatusImage(
+                        status = drone.status,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .padding(end = 6.dp),
+                    )
+                    Text(
+                        text = style.text,
+                        fontWeight = FontWeight.Bold,
+                        color = style.accent,
+                        fontSize = 14.sp,
+                    )
+                }
             }
 
             if (drone.status == Drone.Status.ON_MISSION) {
@@ -286,7 +317,8 @@ private fun ContentBox(
                     progress = { 1f - (drone.activeMissionRemaining.toFloat() / drone.activeMissionDuration) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(6.dp)
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
                         .padding(top = 4.dp),
                     color = DroneColors.Cyan,
                     trackColor = DroneColors.SurfaceAlt,
@@ -306,7 +338,6 @@ private fun ContentBox(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Селектор базы города дислокации
             Text(
                 text = "Выбор базы дислокации дрона:",
                 fontSize = 12.sp,
@@ -314,7 +345,7 @@ private fun ContentBox(
                 color = DroneColors.Cyan,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 4.dp),
+                    .padding(bottom = 6.dp),
             )
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -329,22 +360,24 @@ private fun ContentBox(
                         },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (isSelected) DroneColors.Cyan else DroneColors.SurfaceAlt,
-                            contentColor = if (isSelected) Color.Black else Color.White,
+                            contentColor = if (isSelected) Color(0xFF0B0F14) else DroneColors.TextPrimary,
                         ),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                     ) {
-                        Text(b.city, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text(b.city, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = DroneColors.SurfaceAlt),
+                shape = RoundedCornerShape(14.dp),
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
+                Column(modifier = Modifier.padding(14.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -356,29 +389,34 @@ private fun ContentBox(
                             color = DroneColors.Cyan,
                             fontSize = 13.sp,
                         )
-                        Text(
-                            text = if (telemetry.isOnlineData) "🌐 Open-Meteo (Онлайн)" else "📡 Кэш / Assets (Офлайн)",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (telemetry.isOnlineData) DroneColors.Good else Color(0xFFFF9100),
-                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (telemetry.isOnlineData) DroneColors.GoodDark else DroneColors.WarningDark,
+                        ) {
+                            Text(
+                                text = if (telemetry.isOnlineData) "🌐 Open-Meteo (Онлайн)" else "📡 Офлайн",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (telemetry.isOnlineData) DroneColors.Good else DroneColors.Warning,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("База: ${currentBase.city} (${currentBase.latitude}, ${currentBase.longitude})", color = Color.White, fontSize = 12.sp)
-                    Text("Погода: $weatherDesc, ветер ${telemetry.weather.windSpeed} м/с", color = Color.White, fontSize = 12.sp)
-                    Text("Модель: ${telemetry.model}", color = Color.White, fontSize = 12.sp)
-                    Text("Прошивка: ${telemetry.firmware}", color = Color.White, fontSize = 12.sp)
-                    Text("Дальность: ${telemetry.rangeKm} км", color = Color.White, fontSize = 12.sp)
-                    Text("Сенсоры: ${telemetry.sensorType}", color = Color.White, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("База: ${currentBase.city} (${currentBase.latitude}, ${currentBase.longitude})", color = DroneColors.TextPrimary, fontSize = 12.sp)
+                    Text("Погода: $weatherDesc, ветер ${telemetry.weather.windSpeed} м/с", color = DroneColors.TextPrimary, fontSize = 12.sp)
+                    Text("Модель: ${telemetry.model}", color = DroneColors.TextPrimary, fontSize = 12.sp)
+                    Text("Прошивка: ${telemetry.firmware}", color = DroneColors.TextPrimary, fontSize = 12.sp)
+                    Text("Дальность: ${telemetry.rangeKm} км", color = DroneColors.TextPrimary, fontSize = 12.sp)
+                    Text("Сенсоры: ${telemetry.sensorType}", color = DroneColors.TextPrimary, fontSize = 12.sp)
                     Text(telemetry.notes, color = DroneColors.Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
                 }
             }
         }
     }
 
-    Spacer(modifier = Modifier.height(20.dp))
+    Spacer(modifier = Modifier.height(18.dp))
 
-    // Секция вылета на миссии
     Text(
         text = "Разведывательные вылеты (заправка ⚡):",
         fontWeight = FontWeight.Bold,
@@ -402,10 +440,11 @@ private fun ContentBox(
             },
             enabled = drone.canStartMission(15, credits),
             modifier = Modifier.weight(1f),
-            colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
-            contentPadding = PaddingValues(4.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color(0xFF0B0F14)),
+            shape = RoundedCornerShape(12.dp),
+            contentPadding = PaddingValues(6.dp),
         ) {
-            Text("15с (-${cost15}⚡)", fontWeight = FontWeight.Bold, fontSize = 10.sp)
+            Text("15с (-${cost15}⚡)", fontWeight = FontWeight.Bold, fontSize = 11.sp)
         }
         Button(
             onClick = {
@@ -414,10 +453,11 @@ private fun ContentBox(
             },
             enabled = drone.canStartMission(30, credits),
             modifier = Modifier.weight(1f),
-            colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
-            contentPadding = PaddingValues(4.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color(0xFF0B0F14)),
+            shape = RoundedCornerShape(12.dp),
+            contentPadding = PaddingValues(6.dp),
         ) {
-            Text("30с (-${cost30}⚡)", fontWeight = FontWeight.Bold, fontSize = 10.sp)
+            Text("30с (-${cost30}⚡)", fontWeight = FontWeight.Bold, fontSize = 11.sp)
         }
         Button(
             onClick = {
@@ -427,15 +467,15 @@ private fun ContentBox(
             enabled = drone.canStartMission(60, credits),
             modifier = Modifier.weight(1f),
             colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Pink, contentColor = Color.White),
-            contentPadding = PaddingValues(4.dp),
+            shape = RoundedCornerShape(12.dp),
+            contentPadding = PaddingValues(6.dp),
         ) {
-            Text("60с (-${cost60}⚡)", fontWeight = FontWeight.Bold, fontSize = 10.sp)
+            Text("60с (-${cost60}⚡)", fontWeight = FontWeight.Bold, fontSize = 11.sp)
         }
     }
 
-    Spacer(modifier = Modifier.height(12.dp))
+    Spacer(modifier = Modifier.height(14.dp))
 
-    // Секция Апгрейдов (Батарея, Память, Охлаждение)
     Text(
         text = "Улучшения (Ранг ${drone.rankLevel}, цена ${drone.upgradeCost}⚡):",
         fontWeight = FontWeight.Bold,
@@ -456,7 +496,8 @@ private fun ContentBox(
             enabled = credits >= drone.upgradeCost,
             modifier = Modifier.weight(1f),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Cyan),
-            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+            shape = RoundedCornerShape(12.dp),
+            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
         ) {
             Text("+${drone.batteryBoostAmount}% Заряд", fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
@@ -468,7 +509,8 @@ private fun ContentBox(
             enabled = credits >= drone.upgradeCost,
             modifier = Modifier.weight(1f),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Good),
-            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+            shape = RoundedCornerShape(12.dp),
+            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
         ) {
             Text("+${drone.cargoBoostAmount}% Память", fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
@@ -480,7 +522,8 @@ private fun ContentBox(
             enabled = (credits >= drone.upgradeCost) && (drone.heatRate > 5),
             modifier = Modifier.weight(1f),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Pink),
-            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+            shape = RoundedCornerShape(12.dp),
+            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
         ) {
             Text("-${drone.coolingBoostAmount}°C Нагрев", fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
@@ -495,9 +538,11 @@ private fun ContentBox(
         },
         enabled = drone.canCollectData,
         modifier = Modifier.fillMaxWidth(),
-        colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
+        colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color(0xFF0B0F14)),
+        shape = RoundedCornerShape(12.dp),
+        contentPadding = PaddingValues(12.dp),
     ) {
-        Text("Собрать данные окружения", fontWeight = FontWeight.Bold)
+        Text("Собрать данные окружения", fontWeight = FontWeight.Bold, fontSize = 14.sp)
     }
 
     Spacer(modifier = Modifier.height(8.dp))
@@ -510,8 +555,10 @@ private fun ContentBox(
         enabled = drone.canTransmitData,
         modifier = Modifier.fillMaxWidth(),
         colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Pink, contentColor = Color.White),
+        shape = RoundedCornerShape(12.dp),
+        contentPadding = PaddingValues(12.dp),
     ) {
-        Text("Передать данные на базу", fontWeight = FontWeight.Bold)
+        Text("Передать данные на базу", fontWeight = FontWeight.Bold, fontSize = 14.sp)
     }
 
     Spacer(modifier = Modifier.height(8.dp))
@@ -524,11 +571,13 @@ private fun ContentBox(
         enabled = drone.canHibernate,
         modifier = Modifier.fillMaxWidth(),
         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3), contentColor = Color.White),
+        shape = RoundedCornerShape(12.dp),
+        contentPadding = PaddingValues(12.dp),
     ) {
-        Text("Гибернация (зарядка и охлаждение)", fontWeight = FontWeight.Bold)
+        Text("Гибернация (зарядка и охлаждение)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
     }
 
-    Spacer(modifier = Modifier.height(12.dp))
+    Spacer(modifier = Modifier.height(14.dp))
 
     OutlinedButton(
         onClick = {
@@ -537,8 +586,10 @@ private fun ContentBox(
         },
         modifier = Modifier.fillMaxWidth(),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Cyan),
+        shape = RoundedCornerShape(12.dp),
+        contentPadding = PaddingValues(10.dp),
     ) {
-        Text("Сброс до заводских настроек")
+        Text("Сброс до заводских настроек", fontWeight = FontWeight.SemiBold)
     }
 
     Spacer(modifier = Modifier.height(8.dp))
@@ -549,17 +600,21 @@ private fun ContentBox(
             showDeleteConfirmDialog = true
         },
         modifier = Modifier.fillMaxWidth(),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Danger),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = DroneColors.Danger,
+            containerColor = DroneColors.DangerDark,
+        ),
+        shape = RoundedCornerShape(12.dp),
+        contentPadding = PaddingValues(10.dp),
     ) {
-        Text("Списать (удалить дрон)")
+        Text("Списать (удалить дрон)", fontWeight = FontWeight.Bold)
     }
 
-    // Диалог подтверждения СБРОСА
     if (showResetConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showResetConfirmDialog = false },
             title = { Text("Подтверждение сброса", color = DroneColors.Cyan, fontWeight = FontWeight.Bold) },
-            text = { Text("Вы действительно хотите сбросить все параметры дрона '${drone.name}' до заводских настроек?", color = Color.White) },
+            text = { Text("Вы действительно хотите сбросить все параметры дрона '${drone.name}' до заводских настроек?", color = DroneColors.TextPrimary) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -567,7 +622,8 @@ private fun ContentBox(
                         onReset()
                         showResetConfirmDialog = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
+                    colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color(0xFF0B0F14)),
+                    shape = RoundedCornerShape(10.dp),
                 ) {
                     Text("Сбросить", fontWeight = FontWeight.Bold)
                 }
@@ -576,6 +632,7 @@ private fun ContentBox(
                 OutlinedButton(
                     onClick = { showResetConfirmDialog = false },
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Muted),
+                    shape = RoundedCornerShape(10.dp),
                 ) {
                     Text("Отмена")
                 }
@@ -584,12 +641,11 @@ private fun ContentBox(
         )
     }
 
-    // Диалог подтверждения СПИСАНИЯ/УДАЛЕНИЯ
     if (showDeleteConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirmDialog = false },
             title = { Text("Списание дрона", color = DroneColors.Danger, fontWeight = FontWeight.Bold) },
-            text = { Text("Вы действительно хотите списать и удалить дрон '${drone.name}' из флота?", color = Color.White) },
+            text = { Text("Вы действительно хотите списать и удалить дрон '${drone.name}' из флота?", color = DroneColors.TextPrimary) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -598,6 +654,7 @@ private fun ContentBox(
                         showDeleteConfirmDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Danger, contentColor = Color.White),
+                    shape = RoundedCornerShape(10.dp),
                 ) {
                     Text("Списать", fontWeight = FontWeight.Bold)
                 }
@@ -606,6 +663,7 @@ private fun ContentBox(
                 OutlinedButton(
                     onClick = { showDeleteConfirmDialog = false },
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Muted),
+                    shape = RoundedCornerShape(10.dp),
                 ) {
                     Text("Отмена")
                 }
@@ -628,7 +686,11 @@ private fun NotFoundBox(onBack: () -> Unit) {
             color = DroneColors.Danger,
         )
         Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black)) {
+        Button(
+            onClick = onBack,
+            colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color(0xFF0B0F14)),
+            shape = RoundedCornerShape(10.dp),
+        ) {
             Text("Вернуться к списку", fontWeight = FontWeight.Bold)
         }
     }
@@ -650,7 +712,8 @@ private fun ErrorBox(canRetry: Boolean, message: String, onRetry: () -> Unit) {
         if (canRetry) {
             Button(
                 onClick = onRetry,
-                colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color.Black),
+                colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color(0xFF0B0F14)),
+                shape = RoundedCornerShape(10.dp),
             ) {
                 Text("Повторить загрузку", fontWeight = FontWeight.Bold)
             }
@@ -665,14 +728,16 @@ fun DetailMetricBar(label: String, value: Int, unit: String, color: Color) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(label, fontSize = 13.sp, color = Color(0xFFC9D1D9))
+            Text(label, fontSize = 13.sp, color = DroneColors.TextSecondary)
             Text("$value$unit", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = color)
         }
+        Spacer(modifier = Modifier.height(4.dp))
         LinearProgressIndicator(
             progress = { value / 100f },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(8.dp),
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp)),
             color = if (color == Color.Unspecified) DroneColors.Cyan else color,
             trackColor = DroneColors.SurfaceAlt,
         )
