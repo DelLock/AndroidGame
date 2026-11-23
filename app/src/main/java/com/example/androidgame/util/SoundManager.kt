@@ -1,11 +1,10 @@
-package com.example.androidgame
+package com.example.androidgame.util
 
 import android.media.AudioManager
 import android.media.ToneGenerator
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-
 
 class SoundManager {
     enum class Effect { CLICK, SUCCESS, WARNING, DELETE }
@@ -15,7 +14,7 @@ class SoundManager {
     private val tone: ToneGenerator? = try {
         ToneGenerator(AudioManager.STREAM_MUSIC, 60)
     } catch (_: RuntimeException) {
-        null // на некоторых устройствах/эмуляторах звук недоступен — это не ошибка
+        null
     }
 
     fun play(effect: Effect) {

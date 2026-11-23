@@ -1,4 +1,4 @@
-package com.example.androidgame
+package com.example.androidgame.util
 
 import kotlinx.coroutines.delay
 import retrofit2.HttpException

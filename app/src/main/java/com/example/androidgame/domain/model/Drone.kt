@@ -1,5 +1,6 @@
-package com.example.androidgame
+package com.example.androidgame.domain.model
 
+import com.example.androidgame.data.api.dto.ALL_BASES
 import kotlinx.serialization.Serializable
 
 @Serializable

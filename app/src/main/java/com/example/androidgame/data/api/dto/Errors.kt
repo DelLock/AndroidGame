@@ -1,4 +1,4 @@
-package com.example.androidgame
+package com.example.androidgame.data.api.dto
 
 class DroneNetworkException(
     val canRetry: Boolean,

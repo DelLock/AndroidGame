@@ -1,4 +1,4 @@
-package com.example.androidgame
+package com.example.androidgame.util
 
 import android.content.Context
 import android.net.ConnectivityManager
@@ -32,6 +32,13 @@ class ConnectivityMonitor(context: Context) {
             cm?.registerDefaultNetworkCallback(callback)
         } catch (_: Exception) {
             _online.value = true
+        }
+    }
+
+    fun unregister() {
+        try {
+            cm?.unregisterNetworkCallback(callback)
+        } catch (_: Exception) {
         }
     }
 

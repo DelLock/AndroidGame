@@ -1,10 +1,16 @@
-package com.example.androidgame
+package com.example.androidgame.ui.detail
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.androidgame.data.DroneRepository
+import com.example.androidgame.data.api.dto.DroneNetworkException
+import com.example.androidgame.data.api.dto.DroneNotFoundException
+import com.example.androidgame.data.api.dto.DroneTelemetryDto
+import com.example.androidgame.data.api.dto.isWindy
+import com.example.androidgame.domain.model.Drone
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -91,7 +97,7 @@ class DroneDetailViewModel(
     }
 
     fun onStartMission(durationSeconds: Int) {
-        repo.startMission(droneId, durationSeconds)
+        repo.startMission(durationSeconds = durationSeconds, id = droneId)
         refreshState()
     }
 

@@ -1,4 +1,4 @@
-package com.example.androidgame
+package com.example.androidgame.data
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -7,10 +7,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.example.androidgame.data.api.OpenMeteoApi
+import com.example.androidgame.data.api.dto.CurrentWeatherDto
+import com.example.androidgame.data.api.dto.DroneNetworkException
+import com.example.androidgame.data.api.dto.DroneNotFoundException
+import com.example.androidgame.data.api.dto.DroneTelemetryDto
+import com.example.androidgame.data.api.dto.NORMAL_COLLECT_COST
+import com.example.androidgame.data.api.dto.WINDY_COLLECT_COST
+import com.example.androidgame.data.api.dto.baseFor
+import com.example.androidgame.data.api.dto.isStormy
+import com.example.androidgame.domain.model.Drone
+import com.example.androidgame.domain.model.startDrones
+import com.example.androidgame.util.retryIO
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -24,7 +37,7 @@ class DroneRepository(
     private val openMeteoApi: OpenMeteoApi,
     private val context: Context? = null,
 ) {
-    private val scope = CoroutineScope(Dispatchers.Default)
+    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val json = Json { ignoreUnknownKeys = true }
     private val prefs: SharedPreferences? = context?.getSharedPreferences("drone_hub_storage", Context.MODE_PRIVATE)
 
@@ -56,6 +69,7 @@ class DroneRepository(
     private var lastTickTimestamp = 0L
 
     init {
+        loadSavedWeatherCache()
         scope.launch {
             while (isActive) {
                 delay(1.seconds)
@@ -67,23 +81,35 @@ class DroneRepository(
     fun drone(id: Int): Drone? = drones.find { it.id == id }
 
     private fun loadSavedDrones(): List<Drone> {
-        if ((prefs != null) && prefs.contains("saved_drones_list")) {
-            val savedJson = prefs.getString("saved_drones_list", "[]") ?: "[]"
-            try {
-                return json.decodeFromString<List<Drone>>(savedJson)
-            } catch (e: Exception) {
-                Log.e("DroneRepository", "Ошибка загрузки сохраненных дронов", e)
-            }
+        if (prefs == null || !prefs.contains("saved_drones_list")) return startDrones()
+        val savedJson = prefs.getString("saved_drones_list", null) ?: return startDrones()
+        return try {
+            json.decodeFromString<List<Drone>>(savedJson)
+        } catch (e: Exception) {
+            Log.e("DroneRepository", "Ошибка загрузки сохраненных дронов", e)
+            startDrones()
         }
-        return startDrones()
+    }
+
+    private fun loadSavedWeatherCache() {
+        if (prefs == null || !prefs.contains("saved_weather_cache")) return
+        val savedJson = prefs.getString("saved_weather_cache", null) ?: return
+        try {
+            val cacheMap = json.decodeFromString<Map<String, CurrentWeatherDto>>(savedJson)
+            cityWeatherCache.putAll(cacheMap)
+        } catch (e: Exception) {
+            Log.e("DroneRepository", "Ошибка загрузки кэша погоды", e)
+        }
     }
 
     private fun persistState() {
         if (prefs == null) return
         try {
-            val encoded = json.encodeToString(drones)
+            val encodedDrones = json.encodeToString(drones)
+            val encodedCache = json.encodeToString(cityWeatherCache.toMap())
             prefs.edit()
-                .putString("saved_drones_list", encoded)
+                .putString("saved_drones_list", encodedDrones)
+                .putString("saved_weather_cache", encodedCache)
                 .putInt("saved_credits", credits)
                 .apply()
         } catch (e: Exception) {
@@ -128,7 +154,7 @@ class DroneRepository(
     fun addDrone(customName: String? = null) {
         val defaultName = "Дрон X-%02d".format(nextId)
         val droneName = if (customName.isNullOrBlank()) defaultName else customName.trim()
-        val defaultBase = ALL_BASES[(nextId - 1) % ALL_BASES.size].city
+        val defaultBase = com.example.androidgame.data.api.dto.ALL_BASES[(nextId - 1) % com.example.androidgame.data.api.dto.ALL_BASES.size].city
         val newDrone = Drone(
             id = nextId,
             name = droneName,

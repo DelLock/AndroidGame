@@ -1,4 +1,4 @@
-package com.example.androidgame
+package com.example.androidgame.ui.detail
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -45,6 +45,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.androidgame.data.api.dto.ALL_BASES
+import com.example.androidgame.data.api.dto.DroneTelemetryDto
+import com.example.androidgame.data.api.dto.baseFor
+import com.example.androidgame.data.api.dto.weatherDescription
+import com.example.androidgame.domain.model.Drone
+import com.example.androidgame.ui.components.DroneColors
+import com.example.androidgame.ui.components.DroneImage
+import com.example.androidgame.ui.components.StatusImage
+import com.example.androidgame.ui.components.style
+import com.example.androidgame.util.SoundManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -404,7 +414,7 @@ private fun ContentBox(
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                     Text("База: ${currentBase.city} (${currentBase.latitude}, ${currentBase.longitude})", color = DroneColors.TextPrimary, fontSize = 12.sp)
-                    Text("Погода: $weatherDesc, ветер ${telemetry.weather.windSpeed} м/с", color = DroneColors.TextPrimary, fontSize = 12.sp)
+                    Text("Погода: $weatherDesc, ветер ${"%.1f".format(telemetry.weather.windSpeedMs)} м/с", color = DroneColors.TextPrimary, fontSize = 12.sp)
                     Text("Модель: ${telemetry.model}", color = DroneColors.TextPrimary, fontSize = 12.sp)
                     Text("Прошивка: ${telemetry.firmware}", color = DroneColors.TextPrimary, fontSize = 12.sp)
                     Text("Дальность: ${telemetry.rangeKm} км", color = DroneColors.TextPrimary, fontSize = 12.sp)

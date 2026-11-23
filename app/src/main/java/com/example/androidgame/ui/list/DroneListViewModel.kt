@@ -1,9 +1,11 @@
-package com.example.androidgame
+package com.example.androidgame.ui.list
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import com.example.androidgame.data.DroneRepository
+import com.example.androidgame.domain.model.Drone
 
 enum class DroneFilter { ALL, NORMAL, ON_MISSION, OVERHEATED, DEPLETED, FULL_CARGO }
 

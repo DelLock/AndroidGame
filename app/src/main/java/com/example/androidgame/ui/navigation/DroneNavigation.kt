@@ -1,4 +1,4 @@
-package com.example.androidgame
+package com.example.androidgame.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -9,6 +9,11 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
+import com.example.androidgame.data.DroneRepository
+import com.example.androidgame.ui.detail.DroneDetailScreen
+import com.example.androidgame.ui.detail.DroneDetailViewModel
+import com.example.androidgame.ui.list.DroneListScreen
+import com.example.androidgame.ui.list.DroneListViewModel
 import kotlinx.serialization.Serializable
 
 @Serializable

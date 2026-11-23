@@ -1,4 +1,4 @@
-package com.example.androidgame
+package com.example.androidgame.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
@@ -10,6 +10,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import com.example.androidgame.domain.model.Drone
 
 @Composable
 fun DroneImage(
@@ -31,7 +32,6 @@ fun DroneImage(
             val cx = w / 2f
             val cy = h / 2f
 
-            // 1. Дым при критическом перегреве
             if (status == Drone.Status.OVERHEATED) {
                 drawCircle(color = Color(0x559E9E9E), radius = w * 0.11f, center = Offset(cx - (w * 0.08f), cy - (h * 0.28f)))
                 drawCircle(color = Color(0x66B0BEC5), radius = w * 0.15f, center = Offset(cx + (w * 0.05f), cy - (h * 0.33f)))
@@ -40,7 +40,6 @@ fun DroneImage(
                 drawCircle(color = Color(0x33ECEFF1), radius = w * 0.22f, center = Offset(cx - (w * 0.02f), cy - (h * 0.48f)))
             }
 
-            // 2. Синие буквы Z при низком заряде
             if (status == Drone.Status.DEPLETED) {
                 drawZ(
                     color = Color(0xFF03A9F4),
@@ -59,7 +58,6 @@ fun DroneImage(
             val armLength = w * 0.32f
             val rotorRadius = w * 0.12f
 
-            // 3. Лучи квадрокоптера
             val strokeWidth = w * 0.045f
             val armColor = if (status == Drone.Status.DEPLETED) Color(0xFF37474F) else Color(0xFF455A64)
 
@@ -76,7 +74,6 @@ fun DroneImage(
                 strokeWidth = strokeWidth,
             )
 
-            // 4. Пропеллеры / Моторы
             val rotorCenters = listOf(
                 Offset(cx - armLength, cy - armLength),
                 Offset(cx + armLength, cy - armLength),
@@ -99,7 +96,6 @@ fun DroneImage(
                 )
             }
 
-            // 5. Корпус дрона
             val isFullCargo = status == Drone.Status.FULL_CARGO
             val bodySize = if (isFullCargo) w * 0.44f else w * 0.38f
             val cornerPercent = if (isFullCargo) 0.5f else 0.08f
@@ -119,7 +115,6 @@ fun DroneImage(
                 cornerRadius = CornerRadius(bodySize * cornerPercent, bodySize * cornerPercent),
             )
 
-            // Окантовка корпуса
             val rimColor = when (status) {
                 Drone.Status.OVERHEATED -> Color(0xFFFF5722)
                 Drone.Status.FULL_CARGO -> Color(0xFF81C784)
@@ -135,7 +130,6 @@ fun DroneImage(
                 style = Stroke(width = w * 0.025f),
             )
 
-            // 6. Оптический сенсор / Объектив камеры
             val lensRadius = w * 0.09f
             val lensGlow = when (status) {
                 Drone.Status.OVERHEATED -> Color(0xFFFF3D00)
@@ -156,7 +150,6 @@ fun DroneImage(
                 center = Offset(cx, cy),
             )
 
-            // 7. Светодиодный индикатор статуса систем
             drawCircle(
                 color = statusColor,
                 radius = w * 0.045f,

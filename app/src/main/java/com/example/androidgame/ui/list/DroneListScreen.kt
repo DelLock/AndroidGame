@@ -1,4 +1,4 @@
-package com.example.androidgame
+package com.example.androidgame.ui.list
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -41,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +56,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.androidgame.domain.model.Drone
+import com.example.androidgame.domain.model.startDrones
+import com.example.androidgame.ui.components.DroneColors
+import com.example.androidgame.ui.components.DroneImage
+import com.example.androidgame.ui.components.StatusImage
+import com.example.androidgame.ui.components.style
+import com.example.androidgame.util.ConnectivityMonitor
+import com.example.androidgame.util.SoundManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,6 +82,11 @@ fun DroneListScreen(
 ) {
     val context = LocalContext.current
     val monitor = remember(context) { ConnectivityMonitor(context) }
+    DisposableEffect(monitor) {
+        onDispose {
+            monitor.unregister()
+        }
+    }
     val isOnline by monitor.online.collectAsState()
     val soundManager = remember { SoundManager() }
 

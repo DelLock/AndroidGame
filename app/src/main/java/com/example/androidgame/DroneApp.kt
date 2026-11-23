@@ -1,6 +1,8 @@
 package com.example.androidgame
 
 import android.app.Application
+import com.example.androidgame.data.DroneRepository
+import com.example.androidgame.data.api.OpenMeteoApi
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
