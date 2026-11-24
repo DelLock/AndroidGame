@@ -17,6 +17,7 @@ data class Drone(
     val missionsCompleted: Int = 0,
     val activeMissionDuration: Int = 0,
     val activeMissionRemaining: Int = 0,
+    val missionIsStormy: Boolean = false,
 ) {
     val status: Status
         get() = when {
