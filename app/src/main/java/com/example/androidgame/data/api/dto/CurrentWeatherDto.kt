@@ -1,7 +1,6 @@
 package com.example.androidgame.data.api.dto
 
-import com.example.androidgame.domain.model.isStormy
-import com.example.androidgame.domain.model.isWindy
+import com.example.androidgame.domain.model.Weather
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -14,13 +13,8 @@ data class CurrentWeatherDto(
     val windSpeedMs: Double get() = windSpeedKmH / 3.6
 }
 
-val CurrentWeatherDto.isWindy: Boolean get() = isWindy(windSpeedKmH)
-val CurrentWeatherDto.isStormy: Boolean get() = isStormy(weatherCode)
-
-@Serializable
-data class CachedWeather(
-    val weather: CurrentWeatherDto,
-    val timestamp: Long = System.currentTimeMillis(),
-) {
-    val isExpired: Boolean get() = (System.currentTimeMillis() - timestamp) > 2 * 60 * 60 * 1000L // 2 hours
-}
+fun CurrentWeatherDto.toDomain(): Weather = Weather(
+    temperature = temperature,
+    windSpeedKmH = windSpeedKmH,
+    weatherCode = weatherCode,
+)

@@ -5,10 +5,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.androidgame.data.DroneNetworkException
+import com.example.androidgame.data.DroneNotFoundException
 import com.example.androidgame.data.DroneRepository
-import com.example.androidgame.data.api.dto.DroneNetworkException
-import com.example.androidgame.data.api.dto.DroneNotFoundException
-import com.example.androidgame.data.api.dto.isWindy
 import com.example.androidgame.domain.model.Drone
 import com.example.androidgame.domain.model.DroneTelemetry
 import kotlinx.coroutines.Job

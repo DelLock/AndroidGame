@@ -4,10 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import com.example.androidgame.data.api.OpenMeteoApi
-import com.example.androidgame.data.api.dto.CachedWeather
-import com.example.androidgame.data.api.dto.DroneNetworkException
-import com.example.androidgame.data.api.dto.DroneNotFoundException
-import com.example.androidgame.data.api.dto.isStormy
+import com.example.androidgame.data.api.dto.toDomain
 import com.example.androidgame.domain.model.ALL_BASES
 import com.example.androidgame.domain.model.Drone
 import com.example.androidgame.domain.model.DroneGameEngine
@@ -135,14 +132,14 @@ class DroneRepository(
 
         try {
             val response = retryIO { openMeteoApi.getWeather(base.latitude, base.longitude) }
-            cityWeatherCache[base.city] = CachedWeather(response.currentWeather)
+            cityWeatherCache[base.city] = CachedWeather(response.currentWeather, timestamp = System.currentTimeMillis())
             persistState()
             return DroneTelemetry(
                 model = "CyberScout ${target.name}",
                 firmware = "v3.12.8-cyber-LIVE",
                 rangeKm = 100 + (target.id * 10),
                 sensorType = "LiDAR / Quantum Optical (Онлайн)",
-                weather = response.currentWeather,
+                weather = response.currentWeather.toDomain(),
                 notes = "Прямой поток метеоданных успешно получен по сети с Open-Meteo API (${base.city}).",
                 isOnlineData = true,
             )
@@ -151,13 +148,14 @@ class DroneRepository(
         } catch (_: IOException) {
             val cached = cityWeatherCache[base.city]
             if (cached != null) {
+                val expiredStr = if (cached.isExpired) " [УСТАРЕЛО > 2ч]" else ""
                 return DroneTelemetry(
                     model = "CyberScout ${target.name}",
                     firmware = "v3.12.8-cyber-OFFLINE",
                     rangeKm = 100 + (target.id * 10),
                     sensorType = "LiDAR (из кэша)",
-                    weather = cached.weather,
-                    notes = "Сеть недоступна. Показаны кэшированные данные (${base.city}, возраст: ${(System.currentTimeMillis() - cached.timestamp) / 1000}с).",
+                    weather = cached.weather.toDomain(),
+                    notes = "Сеть недоступна. Кэш (${base.city}, возраст: ${(System.currentTimeMillis() - cached.timestamp) / 1000}с)$expiredStr.",
                     isOnlineData = false,
                 )
             }
@@ -173,7 +171,7 @@ class DroneRepository(
                         firmware = "v3.12.8-cyber-OFFLINE",
                         rangeKm = 100 + (target.id * 10),
                         sensorType = "LiDAR (из кэша)",
-                        weather = cached.weather,
+                        weather = cached.weather.toDomain(),
                         notes = "Ошибка сервера. Показаны кэшированные метеоданные.",
                         isOnlineData = false,
                     )
@@ -191,7 +189,7 @@ class DroneRepository(
                     firmware = "v3.12.8-cyber-OFFLINE",
                     rangeKm = 100 + (target.id * 10),
                     sensorType = "LiDAR (из кэша)",
-                    weather = cached.weather,
+                    weather = cached.weather.toDomain(),
                     notes = "Ошибка десериализации. Показаны кэшированные метеоданные.",
                     isOnlineData = false,
                 )
@@ -371,12 +369,13 @@ class DroneRepository(
         if (!current.canStartMission(durationSeconds, credits)) return
         _credits.value -= launchCost
 
-        if (cityWeatherCache[current.baseCity] == null) {
+        val cached = cityWeatherCache[current.baseCity]
+        if (cached == null || cached.isExpired) {
             scope.launch {
                 try {
                     val base = baseFor(current.baseCity)
                     val response = openMeteoApi.getWeather(base.latitude, base.longitude)
-                    cityWeatherCache[base.city] = CachedWeather(response.currentWeather)
+                    cityWeatherCache[base.city] = CachedWeather(response.currentWeather, timestamp = System.currentTimeMillis())
                     persistState()
                 } catch (_: Exception) {}
             }
@@ -397,7 +396,11 @@ class DroneRepository(
             if (drone.activeMissionRemaining > 0) {
                 stateChanged = true
                 val newRemaining = drone.activeMissionRemaining - 1
-                val isCityStormy = cityWeatherCache[drone.baseCity]?.weather?.isStormy ?: false
+                val cachedWeather = cityWeatherCache[drone.baseCity]
+                val isCityStormy = if (cachedWeather != null && !cachedWeather.isExpired) {
+                    val domainWeather = cachedWeather.weather.toDomain()
+                    domainWeather.isStormy
+                } else false
 
                 if (isCityStormy && (drone.activeMissionDuration >= 30) && (newRemaining == (drone.activeMissionDuration / 2))) {
                     triggerMissionNotice(drone.name, 0, 0)
