@@ -133,10 +133,11 @@ class DroneDetailViewModel(
     }
 
     private suspend fun fetchState(): DroneDetailUiState {
-        val drone = repo.drone(droneId) ?: return DroneDetailUiState.NotFound
+        if (repo.drone(droneId) == null) return DroneDetailUiState.NotFound
         return try {
             val telemetry = repo.fetchTelemetry(droneId)
-            DroneDetailUiState.Content(drone, telemetry, repo.credits)
+            val latestDrone = repo.drone(droneId) ?: return DroneDetailUiState.NotFound
+            DroneDetailUiState.Content(latestDrone, telemetry, repo.credits)
         } catch (_: DroneNotFoundException) {
             DroneDetailUiState.NotFound
         } catch (e: DroneNetworkException) {

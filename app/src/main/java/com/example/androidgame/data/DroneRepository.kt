@@ -35,7 +35,7 @@ import kotlin.time.Duration.Companion.seconds
 
 class DroneRepository(
     private val openMeteoApi: OpenMeteoApi,
-    private val context: Context? = null,
+    context: Context? = null,
     mainContext: CoroutineContext = Dispatchers.Main.immediate,
 ) {
     private val scope = CoroutineScope(mainContext + SupervisorJob())
@@ -63,8 +63,6 @@ class DroneRepository(
     val lastCompletedMissionMessage: String? get() = _lastCompletedMissionMessage.value
 
     private val _missionNoticeTimerSeconds = MutableStateFlow(0)
-    val missionNoticeTimerSecondsFlow: StateFlow<Int> = _missionNoticeTimerSeconds.asStateFlow()
-    val missionNoticeTimerSeconds: Int get() = _missionNoticeTimerSeconds.value
 
     private val cityWeatherCache = mutableMapOf<String, CachedWeather>()
     private val unhandledCompletedMissions = mutableListOf<String>()
@@ -76,10 +74,27 @@ class DroneRepository(
 
     init {
         loadSavedWeatherCache()
+        refreshWeatherForActiveMissions()
         scope.launch {
             while (isActive) {
                 delay(1.seconds)
                 tickMissions()
+            }
+        }
+    }
+
+    private fun refreshWeatherForActiveMissions() {
+        val activeCities = drones.filter { it.activeMissionRemaining > 0 }.map { it.baseCity }.distinct()
+        if (activeCities.isNotEmpty()) {
+            scope.launch {
+                activeCities.forEach { cityName ->
+                    try {
+                        val base = baseFor(cityName)
+                        val response = openMeteoApi.getWeather(base.latitude, base.longitude)
+                        cityWeatherCache[base.city] = CachedWeather(response.currentWeather, timestamp = System.currentTimeMillis())
+                    } catch (_: Exception) {}
+                }
+                persistState()
             }
         }
     }
@@ -386,7 +401,7 @@ class DroneRepository(
                 stateChanged = true
                 val newRemaining = drone.activeMissionRemaining - 1
                 val cachedWeather = cityWeatherCache[drone.baseCity]
-                val isCityStormy = if (cachedWeather != null && !cachedWeather.isExpired) {
+                val isCityStormy = if (cachedWeather != null) {
                     val domainWeather = cachedWeather.weather.toDomain()
                     domainWeather.isStormy
                 } else false
