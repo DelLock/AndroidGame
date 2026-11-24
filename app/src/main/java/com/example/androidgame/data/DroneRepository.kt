@@ -7,6 +7,7 @@ import com.example.androidgame.data.api.OpenMeteoApi
 import com.example.androidgame.data.api.dto.toDomain
 import com.example.androidgame.domain.model.ALL_BASES
 import com.example.androidgame.domain.model.Drone
+import com.example.androidgame.domain.model.DroneBase
 import com.example.androidgame.domain.model.DroneGameEngine
 import com.example.androidgame.domain.model.DroneTelemetry
 import com.example.androidgame.domain.model.NORMAL_COLLECT_COST
@@ -126,6 +127,19 @@ class DroneRepository(
         }
     }
 
+    private fun buildCachedTelemetry(target: Drone, base: DroneBase, cached: CachedWeather, notePrefix: String): DroneTelemetry {
+        val expiredStr = if (cached.isExpired) " [УСТАРЕЛО > 2ч]" else ""
+        return DroneTelemetry(
+            model = "CyberScout ${target.name}",
+            firmware = "v3.12.8-cyber-OFFLINE",
+            rangeKm = 100 + (target.id * 10),
+            sensorType = "LiDAR (из кэша)",
+            weather = cached.weather.toDomain(),
+            notes = "$notePrefix Кэш (${base.city}, возраст: ${(System.currentTimeMillis() - cached.timestamp) / 1000}с)$expiredStr.",
+            isOnlineData = false,
+        )
+    }
+
     suspend fun fetchTelemetry(id: Int): DroneTelemetry {
         val target = drone(id) ?: throw DroneNotFoundException()
         val base = baseFor(target.baseCity)
@@ -148,16 +162,7 @@ class DroneRepository(
         } catch (_: IOException) {
             val cached = cityWeatherCache[base.city]
             if (cached != null) {
-                val expiredStr = if (cached.isExpired) " [УСТАРЕЛО > 2ч]" else ""
-                return DroneTelemetry(
-                    model = "CyberScout ${target.name}",
-                    firmware = "v3.12.8-cyber-OFFLINE",
-                    rangeKm = 100 + (target.id * 10),
-                    sensorType = "LiDAR (из кэша)",
-                    weather = cached.weather.toDomain(),
-                    notes = "Сеть недоступна. Кэш (${base.city}, возраст: ${(System.currentTimeMillis() - cached.timestamp) / 1000}с)$expiredStr.",
-                    isOnlineData = false,
-                )
+                return buildCachedTelemetry(target, base, cached, "Сеть недоступна.")
             }
             throw DroneNetworkException(canRetry = true)
         } catch (e: HttpException) {
@@ -166,15 +171,7 @@ class DroneRepository(
             } else if (e.code() >= 500) {
                 val cached = cityWeatherCache[base.city]
                 if (cached != null) {
-                    return DroneTelemetry(
-                        model = "CyberScout ${target.name}",
-                        firmware = "v3.12.8-cyber-OFFLINE",
-                        rangeKm = 100 + (target.id * 10),
-                        sensorType = "LiDAR (из кэша)",
-                        weather = cached.weather.toDomain(),
-                        notes = "Ошибка сервера. Показаны кэшированные метеоданные.",
-                        isOnlineData = false,
-                    )
+                    return buildCachedTelemetry(target, base, cached, "Ошибка сервера.")
                 }
                 throw DroneNetworkException(canRetry = true, cause = e)
             } else {
@@ -184,15 +181,7 @@ class DroneRepository(
             Log.e("DroneRepository", "Ошибка десериализации ответа сервера для дрона $id", e)
             val cached = cityWeatherCache[base.city]
             if (cached != null) {
-                return DroneTelemetry(
-                    model = "CyberScout ${target.name}",
-                    firmware = "v3.12.8-cyber-OFFLINE",
-                    rangeKm = 100 + (target.id * 10),
-                    sensorType = "LiDAR (из кэша)",
-                    weather = cached.weather.toDomain(),
-                    notes = "Ошибка десериализации. Показаны кэшированные метеоданные.",
-                    isOnlineData = false,
-                )
+                return buildCachedTelemetry(target, base, cached, "Ошибка десериализации.")
             }
             throw DroneNetworkException(canRetry = false, cause = e)
         }

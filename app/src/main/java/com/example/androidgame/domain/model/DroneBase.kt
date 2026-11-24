@@ -19,9 +19,6 @@ const val WIND_LIMIT_MS = 10.0
 const val NORMAL_COLLECT_COST = 15
 const val WINDY_COLLECT_COST = 25
 
-fun isWindy(windSpeedKmH: Double): Boolean = (windSpeedKmH / 3.6) >= WIND_LIMIT_MS
-fun isStormy(weatherCode: Int): Boolean = weatherCode in 95..99 || weatherCode == 82
-
 fun weatherDescription(code: Int): String = when (code) {
     0 -> "Ясно"
     1, 2, 3 -> "Облачно"

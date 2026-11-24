@@ -48,7 +48,7 @@ class DroneDetailViewModel(
                     if (updatedDrone == null) {
                         uiState = DroneDetailUiState.NotFound
                     } else {
-                        uiState = current.copy(drone = updatedDrone, credits = repo.credits)
+                        uiState = current.copy(drone = updatedDrone)
                     }
                 }
             }
