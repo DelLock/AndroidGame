@@ -277,6 +277,19 @@ class DroneRepository(
         }
     }
 
+    private fun triggerStormNotice(droneName: String) {
+        _lastCompletedMissionMessage.value = "⚠️ Дрон '$droneName' попал в шторм и был сбит! Данные утеряны, системы перегреты."
+        _missionNoticeTimerSeconds.value = 8
+        missionNoticeJob?.cancel()
+        missionNoticeJob = scope.launch {
+            while (_missionNoticeTimerSeconds.value > 0) {
+                delay(1.seconds)
+                _missionNoticeTimerSeconds.value = _missionNoticeTimerSeconds.value - 1
+            }
+            clearMissionNotice()
+        }
+    }
+
     fun renameDrone(id: Int, newName: String) {
         val current = drone(id) ?: return
         if (newName.isBlank()) return
@@ -338,6 +351,7 @@ class DroneRepository(
             missionsCompleted = 0,
             activeMissionDuration = 0,
             activeMissionRemaining = 0,
+            missionIsStormy = false,
         )
         updateDrone(updated)
     }
@@ -374,6 +388,8 @@ class DroneRepository(
         _credits.value -= launchCost
 
         val cached = cityWeatherCache[current.baseCity]
+        val isLaunchStormy = cached?.weather?.toDomain()?.isStormy ?: false
+
         if (cached == null || cached.isExpired) {
             scope.launch {
                 try {
@@ -389,6 +405,7 @@ class DroneRepository(
         val updated = current.copy(
             activeMissionDuration = durationSeconds,
             activeMissionRemaining = durationSeconds,
+            missionIsStormy = isLaunchStormy,
             battery = (current.battery - batteryCost).coerceAtLeast(0),
         )
         updateDrone(updated)
@@ -400,17 +417,14 @@ class DroneRepository(
             if (drone.activeMissionRemaining > 0) {
                 stateChanged = true
                 val newRemaining = drone.activeMissionRemaining - 1
-                val cachedWeather = cityWeatherCache[drone.baseCity]
-                val isCityStormy = if (cachedWeather != null) {
-                    val domainWeather = cachedWeather.weather.toDomain()
-                    domainWeather.isStormy
-                } else false
+                val isCityStormy = drone.missionIsStormy || (cityWeatherCache[drone.baseCity]?.weather?.toDomain()?.isStormy == true)
 
                 if (isCityStormy && (drone.activeMissionDuration >= 30) && (newRemaining == (drone.activeMissionDuration / 2))) {
-                    triggerMissionNotice(drone.name, 0, 0)
+                    triggerStormNotice(drone.name)
                     drone.copy(
                         activeMissionDuration = 0,
                         activeMissionRemaining = 0,
+                        missionIsStormy = false,
                         cargo = 0,
                         battery = 0,
                         temperature = 90,
@@ -425,6 +439,7 @@ class DroneRepository(
                     drone.copy(
                         activeMissionDuration = 0,
                         activeMissionRemaining = 0,
+                        missionIsStormy = false,
                         missionsCompleted = totalMissions,
                         rankLevel = newRankLevel,
                         cargo = (drone.cargo + cargoGain).coerceAtMost(drone.maxCargo),
