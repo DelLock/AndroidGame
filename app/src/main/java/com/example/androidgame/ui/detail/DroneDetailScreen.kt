@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,11 +46,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.androidgame.data.api.dto.ALL_BASES
-import com.example.androidgame.data.api.dto.DroneTelemetryDto
-import com.example.androidgame.data.api.dto.baseFor
-import com.example.androidgame.data.api.dto.weatherDescription
+import com.example.androidgame.domain.model.ALL_BASES
 import com.example.androidgame.domain.model.Drone
+import com.example.androidgame.domain.model.DroneTelemetry
+import com.example.androidgame.domain.model.baseFor
+import com.example.androidgame.domain.model.weatherDescription
 import com.example.androidgame.ui.components.DroneColors
 import com.example.androidgame.ui.components.DroneImage
 import com.example.androidgame.ui.components.StatusImage
@@ -76,6 +77,11 @@ fun DroneDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     val soundManager = remember { SoundManager() }
+    DisposableEffect(soundManager) {
+        onDispose {
+            soundManager.release()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -159,7 +165,7 @@ private fun LoadingBox() {
 @Composable
 private fun ContentBox(
     drone: Drone,
-    telemetry: DroneTelemetryDto,
+    telemetry: DroneTelemetry,
     credits: Int,
     soundManager: SoundManager,
     onRename: (String) -> Unit,

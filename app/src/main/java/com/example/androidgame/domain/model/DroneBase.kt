@@ -1,21 +1,4 @@
-package com.example.androidgame.data.api.dto
-
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-
-@Serializable
-data class CurrentWeatherDto(
-    @SerialName("temperature") val temperature: Double,
-    @SerialName("windspeed") val windSpeedKmH: Double,
-    @SerialName("weathercode") val weatherCode: Int,
-) {
-    val windSpeedMs: Double get() = windSpeedKmH / 3.6
-}
-
-const val WIND_LIMIT_MS = 10.0
-
-const val NORMAL_COLLECT_COST = 15
-const val WINDY_COLLECT_COST = 25
+package com.example.androidgame.domain.model
 
 data class DroneBase(val city: String, val latitude: Double, val longitude: Double)
 
@@ -32,9 +15,12 @@ val ALL_BASES = listOf(
 
 fun baseFor(city: String): DroneBase = ALL_BASES.find { it.city.equals(city, ignoreCase = true) } ?: ALL_BASES.first()
 
-val CurrentWeatherDto.isWindy: Boolean get() = windSpeedMs >= WIND_LIMIT_MS
+const val WIND_LIMIT_MS = 10.0
+const val NORMAL_COLLECT_COST = 15
+const val WINDY_COLLECT_COST = 25
 
-val CurrentWeatherDto.isStormy: Boolean get() = weatherCode in 95..99 || weatherCode == 82
+fun isWindy(windSpeedKmH: Double): Boolean = (windSpeedKmH / 3.6) >= WIND_LIMIT_MS
+fun isStormy(weatherCode: Int): Boolean = weatherCode in 95..99 || weatherCode == 82
 
 fun weatherDescription(code: Int): String = when (code) {
     0 -> "Ясно"

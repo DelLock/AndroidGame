@@ -26,4 +26,10 @@ class SoundManager {
             Effect.DELETE -> tone?.startTone(ToneGenerator.TONE_PROP_BEEP2, 150)
         }
     }
+
+    fun release() {
+        try {
+            tone?.release()
+        } catch (_: Exception) {}
+    }
 }

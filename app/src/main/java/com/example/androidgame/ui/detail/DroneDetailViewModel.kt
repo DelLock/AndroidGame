@@ -8,20 +8,17 @@ import androidx.lifecycle.viewModelScope
 import com.example.androidgame.data.DroneRepository
 import com.example.androidgame.data.api.dto.DroneNetworkException
 import com.example.androidgame.data.api.dto.DroneNotFoundException
-import com.example.androidgame.data.api.dto.DroneTelemetryDto
 import com.example.androidgame.data.api.dto.isWindy
 import com.example.androidgame.domain.model.Drone
+import com.example.androidgame.domain.model.DroneTelemetry
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlin.time.Duration.Companion.seconds
 
 sealed interface DroneDetailUiState {
     data object Loading : DroneDetailUiState
     data class Content(
         val drone: Drone,
-        val telemetry: DroneTelemetryDto,
+        val telemetry: DroneTelemetry,
         val credits: Int,
     ) : DroneDetailUiState
     data object NotFound : DroneDetailUiState
@@ -45,9 +42,24 @@ class DroneDetailViewModel(
     init {
         load()
         viewModelScope.launch {
-            while (isActive) {
-                delay(1.seconds)
-                refreshState()
+            repo.dronesFlow.collect { drones ->
+                val updatedDrone = drones.find { it.id == droneId }
+                val current = uiState
+                if (current is DroneDetailUiState.Content) {
+                    if (updatedDrone == null) {
+                        uiState = DroneDetailUiState.NotFound
+                    } else {
+                        uiState = current.copy(drone = updatedDrone, credits = repo.credits)
+                    }
+                }
+            }
+        }
+        viewModelScope.launch {
+            repo.creditsFlow.collect { credits ->
+                val current = uiState
+                if (current is DroneDetailUiState.Content) {
+                    uiState = current.copy(credits = credits)
+                }
             }
         }
     }
@@ -66,7 +78,6 @@ class DroneDetailViewModel(
 
     fun onRename(newName: String) {
         repo.renameDrone(droneId, newName)
-        refreshState()
     }
 
     fun onSetBase(baseCity: String) {
@@ -78,42 +89,34 @@ class DroneDetailViewModel(
     fun onCollectData() {
         val isWindy = (uiState as? DroneDetailUiState.Content)?.telemetry?.weather?.isWindy ?: false
         repo.collectData(droneId, isWindy)
-        refreshState()
     }
 
     fun onTransmitData() {
         repo.transmitData(droneId)
-        refreshState()
     }
 
     fun onHibernate() {
         repo.hibernate(droneId)
-        refreshState()
     }
 
     fun onReset() {
         repo.resetDrone(droneId)
-        refreshState()
     }
 
     fun onStartMission(durationSeconds: Int) {
         repo.startMission(id = droneId, durationSeconds = durationSeconds)
-        refreshState()
     }
 
     fun onUpgradeBattery() {
         repo.upgradeBattery(droneId)
-        refreshState()
     }
 
     fun onUpgradeCargo() {
         repo.upgradeCargo(droneId)
-        refreshState()
     }
 
     fun onUpgradeCooling() {
         repo.upgradeCooling(droneId)
-        refreshState()
     }
 
     fun onDelete() = repo.deleteDrone(droneId)
@@ -127,18 +130,6 @@ class DroneDetailViewModel(
                 retryCount = 0
             }
             uiState = result
-        }
-    }
-
-    private fun refreshState() {
-        val current = uiState
-        if (current is DroneDetailUiState.Content) {
-            val updatedDrone = repo.drone(droneId)
-            uiState = if (updatedDrone == null) {
-                DroneDetailUiState.NotFound
-            } else {
-                current.copy(drone = updatedDrone, credits = repo.credits)
-            }
         }
     }
 

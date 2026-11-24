@@ -89,6 +89,11 @@ fun DroneListScreen(
     }
     val isOnline by monitor.online.collectAsState()
     val soundManager = remember { SoundManager() }
+    DisposableEffect(soundManager) {
+        onDispose {
+            soundManager.release()
+        }
+    }
 
     var showAddDialog by remember { mutableStateOf(value = false) }
     var filterMenuExpanded by remember { mutableStateOf(value = false) }

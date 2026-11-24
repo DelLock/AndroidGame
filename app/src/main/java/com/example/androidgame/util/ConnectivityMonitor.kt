@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -19,7 +20,8 @@ class ConnectivityMonitor(context: Context) {
         }
 
         override fun onLost(network: Network) {
-            _online.value = currentlyOnline()
+            // Immediately set offline when default network is lost
+            _online.value = false
         }
 
         override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
@@ -30,7 +32,8 @@ class ConnectivityMonitor(context: Context) {
     init {
         try {
             cm?.registerDefaultNetworkCallback(callback)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("ConnectivityMonitor", "Failed to register network callback", e)
             _online.value = true
         }
     }
@@ -38,20 +41,25 @@ class ConnectivityMonitor(context: Context) {
     fun unregister() {
         try {
             cm?.unregisterNetworkCallback(callback)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            // Ignored if callback was not registered or already unregistered
+            Log.d("ConnectivityMonitor", "Unregister callback ignored", e)
         }
     }
 
     private fun currentlyOnline(): Boolean {
         val manager = cm ?: return true
         return try {
-            val caps = manager.getNetworkCapabilities(manager.activeNetwork)
-            (caps != null) && hasInternet(caps)
-        } catch (_: Exception) {
+            val network = manager.activeNetwork ?: return false
+            val caps = manager.getNetworkCapabilities(network) ?: return false
+            hasInternet(caps)
+        } catch (e: Exception) {
+            Log.e("ConnectivityMonitor", "Error checking network capabilities", e)
             true
         }
     }
 
     private fun hasInternet(caps: NetworkCapabilities): Boolean =
-        caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
 }
