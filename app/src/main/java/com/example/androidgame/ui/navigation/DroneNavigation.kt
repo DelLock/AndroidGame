@@ -65,7 +65,7 @@ fun DroneNavigation(repo: DroneRepository, modifier: Modifier = Modifier) {
                 }
                 DroneDetailScreen(
                     state = viewModel.uiState,
-                    onRetry = viewModel::onRetry,
+                    onRefreshWeather = viewModel::onRefreshWeather,
                     onRename = viewModel::onRename,
                     onSetBase = viewModel::onSetBase,
                     onCollectData = viewModel::onCollectData,

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import com.example.androidgame.data.api.OpenMeteoApi
+import com.example.androidgame.data.api.dto.CurrentWeatherDto
 import com.example.androidgame.data.api.dto.toDomain
 import com.example.androidgame.domain.model.ALL_BASES
 import com.example.androidgame.domain.model.Drone
@@ -17,9 +18,11 @@ import com.example.androidgame.domain.model.startDrones
 import com.example.androidgame.util.retryIO
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -56,15 +59,15 @@ class DroneRepository(
 
     private val _undoTimerSeconds = MutableStateFlow(0)
     val undoTimerSecondsFlow: StateFlow<Int> = _undoTimerSeconds.asStateFlow()
-    val undoTimerSeconds: Int get() = _undoTimerSeconds.value
 
     private val _lastCompletedMissionMessage = MutableStateFlow<String?>(null)
     val lastCompletedMissionMessageFlow: StateFlow<String?> = _lastCompletedMissionMessage.asStateFlow()
-    val lastCompletedMissionMessage: String? get() = _lastCompletedMissionMessage.value
 
     private val _missionNoticeTimerSeconds = MutableStateFlow(0)
 
     private val cityWeatherCache = mutableMapOf<String, CachedWeather>()
+    private val inFlight = mutableMapOf<String, Deferred<CurrentWeatherDto>>()
+
     private val unhandledCompletedMissions = mutableListOf<String>()
     private var totalPendingReward = 0
 
@@ -79,22 +82,6 @@ class DroneRepository(
             while (isActive) {
                 delay(1.seconds)
                 tickMissions()
-            }
-        }
-    }
-
-    private fun refreshWeatherForActiveMissions() {
-        val activeCities = drones.filter { it.activeMissionRemaining > 0 }.map { it.baseCity }.distinct()
-        if (activeCities.isNotEmpty()) {
-            scope.launch {
-                activeCities.forEach { cityName ->
-                    try {
-                        val base = baseFor(cityName)
-                        val response = openMeteoApi.getWeather(base.latitude, base.longitude)
-                        cityWeatherCache[base.city] = CachedWeather(response.currentWeather, timestamp = System.currentTimeMillis())
-                    } catch (_: Exception) {}
-                }
-                persistState()
             }
         }
     }
@@ -142,6 +129,52 @@ class DroneRepository(
         }
     }
 
+    private fun refreshWeatherForActiveMissions() {
+        val activeCities = drones.filter { it.activeMissionRemaining > 0 }.map { it.baseCity }.distinct()
+        if (activeCities.isNotEmpty()) {
+            scope.launch {
+                activeCities.forEach { cityName ->
+                    try {
+                        getOrFetchWeather(cityName, forceNetwork = false)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.w("DroneRepository", "Ошибка обновления погоды для активных миссий в городе $cityName", e)
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun getOrFetchWeather(cityName: String, forceNetwork: Boolean): CurrentWeatherDto {
+        val base = baseFor(cityName)
+        val cached = cityWeatherCache[base.city]
+
+        if (!forceNetwork && cached != null && cached.isFresh) {
+            return cached.weather
+        }
+
+        val existingJob = inFlight[base.city]
+        if (existingJob != null) {
+            return existingJob.await()
+        }
+
+        val deferred = scope.async {
+            try {
+                val response = retryIO { openMeteoApi.getWeather(base.latitude, base.longitude) }
+                val dto = response.currentWeather
+                cityWeatherCache[base.city] = CachedWeather(dto, timestamp = System.currentTimeMillis())
+                persistState()
+                dto
+            } finally {
+                inFlight.remove(base.city)
+            }
+        }
+
+        inFlight[base.city] = deferred
+        return deferred.await()
+    }
+
     private fun buildCachedTelemetry(target: Drone, base: DroneBase, cached: CachedWeather, notePrefix: String): DroneTelemetry {
         val expiredStr = if (cached.isExpired) " [УСТАРЕЛО > 2ч]" else ""
         return DroneTelemetry(
@@ -155,50 +188,59 @@ class DroneRepository(
         )
     }
 
-    suspend fun fetchTelemetry(id: Int): DroneTelemetry {
+    suspend fun fetchTelemetry(id: Int, forceRefresh: Boolean = false): DroneTelemetry {
         val target = drone(id) ?: throw DroneNotFoundException()
         val base = baseFor(target.baseCity)
 
         try {
-            val response = retryIO { openMeteoApi.getWeather(base.latitude, base.longitude) }
-            cityWeatherCache[base.city] = CachedWeather(response.currentWeather, timestamp = System.currentTimeMillis())
-            persistState()
+            val dto = getOrFetchWeather(base.city, forceNetwork = forceRefresh)
             return DroneTelemetry(
                 model = "CyberScout ${target.name}",
                 firmware = "v3.12.8-cyber-LIVE",
                 rangeKm = 100 + (target.id * 10),
                 sensorType = "LiDAR / Quantum Optical (Онлайн)",
-                weather = response.currentWeather.toDomain(),
+                weather = dto.toDomain(),
                 notes = "Прямой поток метеоданных успешно получен по сети с Open-Meteo API (${base.city}).",
                 isOnlineData = true,
             )
         } catch (e: CancellationException) {
             throw e
-        } catch (_: IOException) {
+        } catch (e: IOException) {
             val cached = cityWeatherCache[base.city]
             if (cached != null) {
-                return buildCachedTelemetry(target, base, cached, "Сеть недоступна.")
+                return buildCachedTelemetry(target, base, cached, "Нет сети.")
             }
-            throw DroneNetworkException(canRetry = true)
+            throw DroneNetworkException(
+                reason = NetworkErrorReason.NO_NETWORK,
+                canRetry = true,
+                cause = e,
+            )
         } catch (e: HttpException) {
-            if (e.code() == 404) {
-                throw DroneNotFoundException()
-            } else if (e.code() >= 500) {
-                val cached = cityWeatherCache[base.city]
-                if (cached != null) {
-                    return buildCachedTelemetry(target, base, cached, "Ошибка сервера.")
-                }
-                throw DroneNetworkException(canRetry = true, cause = e)
-            } else {
-                throw DroneNetworkException(canRetry = false, cause = e)
+            val cached = cityWeatherCache[base.city]
+            val reason = when (e.code()) {
+                429 -> NetworkErrorReason.RATE_LIMIT
+                in 500..599 -> NetworkErrorReason.SERVER_ERROR
+                else -> NetworkErrorReason.OTHER
             }
+            if (cached != null) {
+                return buildCachedTelemetry(target, base, cached, "Ошибка сервера (${e.code()}).")
+            }
+            throw DroneNetworkException(
+                reason = reason,
+                canRetry = e.code() == 429 || e.code() >= 500,
+                cause = e,
+            )
         } catch (e: SerializationException) {
             Log.e("DroneRepository", "Ошибка десериализации ответа сервера для дрона $id", e)
             val cached = cityWeatherCache[base.city]
             if (cached != null) {
-                return buildCachedTelemetry(target, base, cached, "Ошибка десериализации.")
+                return buildCachedTelemetry(target, base, cached, "Ошибка формата.")
             }
-            throw DroneNetworkException(canRetry = false, cause = e)
+            throw DroneNetworkException(
+                reason = NetworkErrorReason.FORMAT_ERROR,
+                canRetry = false,
+                cause = e,
+            )
         }
     }
 
@@ -390,14 +432,13 @@ class DroneRepository(
         val cached = cityWeatherCache[current.baseCity]
         val isLaunchStormy = cached?.weather?.toDomain()?.isStormy ?: false
 
-        if (cached == null || cached.isExpired) {
-            scope.launch {
-                try {
-                    val base = baseFor(current.baseCity)
-                    val response = openMeteoApi.getWeather(base.latitude, base.longitude)
-                    cityWeatherCache[base.city] = CachedWeather(response.currentWeather, timestamp = System.currentTimeMillis())
-                    persistState()
-                } catch (_: Exception) {}
+        scope.launch {
+            try {
+                getOrFetchWeather(current.baseCity, forceNetwork = false)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w("DroneRepository", "Ошибка подгрузки погоды перед миссией дрона $id", e)
             }
         }
 
@@ -413,6 +454,8 @@ class DroneRepository(
 
     private fun tickMissions() {
         var stateChanged = false
+        var forcePersist = false
+
         val updatedDrones = _drones.value.map { drone ->
             if (drone.activeMissionRemaining > 0) {
                 stateChanged = true
@@ -420,6 +463,7 @@ class DroneRepository(
                 val isCityStormy = drone.missionIsStormy || (cityWeatherCache[drone.baseCity]?.weather?.toDomain()?.isStormy == true)
 
                 if (isCityStormy && (drone.activeMissionDuration >= 30) && (newRemaining == (drone.activeMissionDuration / 2))) {
+                    forcePersist = true
                     triggerStormNotice(drone.name)
                     drone.copy(
                         activeMissionDuration = 0,
@@ -430,6 +474,7 @@ class DroneRepository(
                         temperature = 90,
                     )
                 } else if (newRemaining <= 0) {
+                    forcePersist = true
                     val reward = DroneGameEngine.missionReward(drone.activeMissionDuration)
                     val cargoGain = DroneGameEngine.cargoGain(drone.activeMissionDuration)
                     val expGain = DroneGameEngine.expGain(drone.activeMissionDuration)
@@ -452,7 +497,10 @@ class DroneRepository(
         }
         if (stateChanged) {
             _drones.value = updatedDrones
-            persistState()
+            val hasJustFinished = forcePersist || updatedDrones.any { it.activeMissionRemaining % 5 == 0 }
+            if (hasJustFinished) {
+                persistState()
+            }
         }
     }
 

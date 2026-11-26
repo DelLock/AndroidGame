@@ -46,6 +46,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -95,9 +96,9 @@ fun DroneListScreen(
         }
     }
 
-    var showAddDialog by remember { mutableStateOf(value = false) }
-    var filterMenuExpanded by remember { mutableStateOf(value = false) }
-    var newDroneNameInput by remember { mutableStateOf("") }
+    var showAddDialog by rememberSaveable { mutableStateOf(false) }
+    var filterMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    var newDroneNameInput by rememberSaveable { mutableStateOf("") }
 
     Scaffold(
         topBar = {

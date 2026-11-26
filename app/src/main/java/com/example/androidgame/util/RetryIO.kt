@@ -1,5 +1,6 @@
 package com.example.androidgame.util
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import retrofit2.HttpException
 import java.io.IOException
@@ -14,9 +15,14 @@ suspend fun <T> retryIO(
     repeat(times - 1) {
         try {
             return block()
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: IOException) {
         } catch (e: HttpException) {
-            if (e.code() < 500) throw e
+            val code = e.code()
+            if (code != 408 && code != 429 && code < 500) {
+                throw e
+            }
         }
         delay(pause.milliseconds)
         pause *= 2

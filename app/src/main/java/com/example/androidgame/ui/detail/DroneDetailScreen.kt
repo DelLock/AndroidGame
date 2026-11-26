@@ -23,7 +23,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -37,6 +36,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,7 +48,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.androidgame.domain.model.ALL_BASES
 import com.example.androidgame.domain.model.Drone
-import com.example.androidgame.domain.model.DroneTelemetry
 import com.example.androidgame.domain.model.baseFor
 import com.example.androidgame.domain.model.weatherDescription
 import com.example.androidgame.ui.components.DroneColors
@@ -61,7 +60,7 @@ import com.example.androidgame.util.SoundManager
 @Composable
 fun DroneDetailScreen(
     state: DroneDetailUiState,
-    onRetry: () -> Unit,
+    onRefreshWeather: () -> Unit,
     onRename: (String) -> Unit,
     onSetBase: (String) -> Unit,
     onCollectData: () -> Unit,
@@ -117,12 +116,12 @@ fun DroneDetailScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             when (state) {
-                DroneDetailUiState.Loading -> LoadingBox()
                 is DroneDetailUiState.Content -> ContentBox(
                     drone = state.drone,
-                    telemetry = state.telemetry,
+                    weatherState = state.weatherState,
                     credits = state.credits,
                     soundManager = soundManager,
+                    onRefreshWeather = onRefreshWeather,
                     onRename = onRename,
                     onSetBase = onSetBase,
                     onCollectData = onCollectData,
@@ -136,38 +135,18 @@ fun DroneDetailScreen(
                     onDelete = onDelete,
                 )
                 DroneDetailUiState.NotFound -> NotFoundBox(onBack)
-                is DroneDetailUiState.Error -> ErrorBox(state.canRetry, state.message, onRetry)
             }
         }
     }
 }
 
 @Composable
-private fun LoadingBox() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        CircularProgressIndicator(color = DroneColors.Cyan)
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Установка сетевого соединения с дроном...",
-            color = DroneColors.Cyan,
-            fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-@Composable
 private fun ContentBox(
     drone: Drone,
-    telemetry: DroneTelemetry,
+    weatherState: WeatherState,
     credits: Int,
     soundManager: SoundManager,
+    onRefreshWeather: () -> Unit,
     onRename: (String) -> Unit,
     onSetBase: (String) -> Unit,
     onCollectData: () -> Unit,
@@ -182,12 +161,11 @@ private fun ContentBox(
 ) {
     val style = drone.status.style()
     val currentBase = baseFor(drone.baseCity)
-    val weatherDesc = weatherDescription(telemetry.weather.weatherCode)
 
-    var isEditingName by remember { mutableStateOf(value = false) }
-    var nameInput by remember(drone.name) { mutableStateOf(drone.name) }
-    var showResetConfirmDialog by remember { mutableStateOf(value = false) }
-    var showDeleteConfirmDialog by remember { mutableStateOf(value = false) }
+    var isEditingName by rememberSaveable { mutableStateOf(false) }
+    var nameInput by rememberSaveable(drone.name) { mutableStateOf(drone.name) }
+    var showResetConfirmDialog by rememberSaveable { mutableStateOf(false) }
+    var showDeleteConfirmDialog by rememberSaveable { mutableStateOf(false) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -405,27 +383,141 @@ private fun ContentBox(
                             color = DroneColors.Cyan,
                             fontSize = 13.sp,
                         )
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (telemetry.isOnlineData) DroneColors.GoodDark else DroneColors.WarningDark,
-                        ) {
-                            Text(
-                                text = if (telemetry.isOnlineData) "🌐 Open-Meteo (Онлайн)" else "📡 Офлайн",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (telemetry.isOnlineData) DroneColors.Good else DroneColors.Warning,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            )
+                        when (weatherState) {
+                            WeatherState.Loading -> {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = DroneColors.CyanDark,
+                                ) {
+                                    Text(
+                                        text = "⏳ Загрузка...",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = DroneColors.Cyan,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    )
+                                }
+                            }
+                            is WeatherState.Loaded -> {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = DroneColors.GoodDark,
+                                ) {
+                                    Text(
+                                        text = "🌐 Open-Meteo (Онлайн)",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = DroneColors.Good,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    )
+                                }
+                            }
+                            is WeatherState.Cached -> {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = DroneColors.WarningDark,
+                                    ) {
+                                        Text(
+                                            text = "📡 Офлайн (Кэш)",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = DroneColors.Warning,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        )
+                                    }
+                                    OutlinedButton(
+                                        onClick = {
+                                            soundManager.play(SoundManager.Effect.CLICK)
+                                            onRefreshWeather()
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Cyan),
+                                        shape = RoundedCornerShape(8.dp),
+                                    ) {
+                                        Text("Обновить", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                            is WeatherState.Failed -> {
+                                if (weatherState.canRetry) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            soundManager.play(SoundManager.Effect.CLICK)
+                                            onRefreshWeather()
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Cyan),
+                                        shape = RoundedCornerShape(8.dp),
+                                    ) {
+                                        Text("Обновить", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                } else {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = DroneColors.DangerDark,
+                                    ) {
+                                        Text(
+                                            text = "Лимит превышен",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = DroneColors.Danger,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
+
                     Spacer(modifier = Modifier.height(6.dp))
+
                     Text("База: ${currentBase.city} (${currentBase.latitude}, ${currentBase.longitude})", color = DroneColors.TextPrimary, fontSize = 12.sp)
-                    Text("Погода: $weatherDesc, ветер ${"%.1f".format(telemetry.weather.windSpeedMs)} м/с", color = DroneColors.TextPrimary, fontSize = 12.sp)
-                    Text("Модель: ${telemetry.model}", color = DroneColors.TextPrimary, fontSize = 12.sp)
-                    Text("Прошивка: ${telemetry.firmware}", color = DroneColors.TextPrimary, fontSize = 12.sp)
-                    Text("Дальность: ${telemetry.rangeKm} км", color = DroneColors.TextPrimary, fontSize = 12.sp)
-                    Text("Сенсоры: ${telemetry.sensorType}", color = DroneColors.TextPrimary, fontSize = 12.sp)
-                    Text(telemetry.notes, color = DroneColors.Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+
+                    when (weatherState) {
+                        WeatherState.Loading -> {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                CircularProgressIndicator(
+                                    color = DroneColors.Cyan,
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                                Text("Получение сведений от Open-Meteo API...", color = DroneColors.Cyan, fontSize = 12.sp)
+                            }
+                        }
+                        is WeatherState.Loaded -> {
+                            val telemetry = weatherState.telemetry
+                            val weatherDesc = weatherDescription(telemetry.weather.weatherCode)
+                            Text("Погода: $weatherDesc, ветер ${"%.1f".format(telemetry.weather.windSpeedMs)} м/с", color = DroneColors.TextPrimary, fontSize = 12.sp)
+                            Text("Модель: ${telemetry.model}", color = DroneColors.TextPrimary, fontSize = 12.sp)
+                            Text("Прошивка: ${telemetry.firmware}", color = DroneColors.TextPrimary, fontSize = 12.sp)
+                            Text("Дальность: ${telemetry.rangeKm} км", color = DroneColors.TextPrimary, fontSize = 12.sp)
+                            Text("Сенсоры: ${telemetry.sensorType}", color = DroneColors.TextPrimary, fontSize = 12.sp)
+                            Text(telemetry.notes, color = DroneColors.Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                        }
+                        is WeatherState.Cached -> {
+                            val telemetry = weatherState.telemetry
+                            val weatherDesc = weatherDescription(telemetry.weather.weatherCode)
+                            Text("Погода: $weatherDesc, ветер ${"%.1f".format(telemetry.weather.windSpeedMs)} м/с", color = DroneColors.TextPrimary, fontSize = 12.sp)
+                            Text("Модель: ${telemetry.model}", color = DroneColors.TextPrimary, fontSize = 12.sp)
+                            Text("Прошивка: ${telemetry.firmware}", color = DroneColors.TextPrimary, fontSize = 12.sp)
+                            Text("Дальность: ${telemetry.rangeKm} км", color = DroneColors.TextPrimary, fontSize = 12.sp)
+                            Text("Сенсоры: ${telemetry.sensorType}", color = DroneColors.TextPrimary, fontSize = 12.sp)
+                            Text(telemetry.notes, color = DroneColors.Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                        }
+                        is WeatherState.Failed -> {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(weatherState.message, color = DroneColors.Danger, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Сеть недоступна, кэш отсутствует. Дрон остаётся полностью управляемым.", color = DroneColors.Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                        }
+                    }
                 }
             }
         }
@@ -708,31 +800,6 @@ private fun NotFoundBox(onBack: () -> Unit) {
             shape = RoundedCornerShape(10.dp),
         ) {
             Text("Вернуться к списку", fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
-private fun ErrorBox(canRetry: Boolean, message: String, onRetry: () -> Unit) {
-    Column(
-        modifier = Modifier.padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = message,
-            style = MaterialTheme.typography.titleMedium,
-            color = DroneColors.Danger,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        if (canRetry) {
-            Button(
-                onClick = onRetry,
-                colors = ButtonDefaults.buttonColors(containerColor = DroneColors.Cyan, contentColor = Color(0xFF0B0F14)),
-                shape = RoundedCornerShape(10.dp),
-            ) {
-                Text("Повторить загрузку", fontWeight = FontWeight.Bold)
-            }
         }
     }
 }
