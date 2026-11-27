@@ -66,6 +66,14 @@ class DroneRepository(
 
     private val _missionNoticeTimerSeconds = MutableStateFlow(0)
 
+    // Итог последнего сетевого запроса: false только если запрос провалился из-за сети (нет ответа сервера).
+    private val _networkReachable = MutableStateFlow(true)
+    val networkReachableFlow: StateFlow<Boolean> = _networkReachable.asStateFlow()
+
+    fun resetNetworkStatus() {
+        _networkReachable.value = true
+    }
+
     private val cityWeatherCache = mutableMapOf<String, CachedWeather>()
     private val inFlight = mutableMapOf<String, Deferred<CurrentWeatherDto>>()
 
@@ -162,7 +170,19 @@ class DroneRepository(
 
         val deferred = scope.async(start = CoroutineStart.LAZY) {
             try {
-                val response = retryIO { openMeteoApi.getWeather(base.latitude, base.longitude) }
+                val response = try {
+                    retryIO { openMeteoApi.getWeather(base.latitude, base.longitude) }
+                } catch (e: IOException) {
+                    _networkReachable.value = false
+                    throw e
+                } catch (e: HttpException) {
+                    _networkReachable.value = true
+                    throw e
+                } catch (e: SerializationException) {
+                    _networkReachable.value = true
+                    throw e
+                }
+                _networkReachable.value = true
                 val dto = response.currentWeather
                 cityWeatherCache[base.city] = CachedWeather(dto, timestamp = System.currentTimeMillis())
                 persistState()

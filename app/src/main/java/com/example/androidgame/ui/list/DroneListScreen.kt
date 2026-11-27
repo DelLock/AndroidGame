@@ -42,6 +42,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -80,6 +81,7 @@ fun DroneListScreen(
     onDismissMissionNotice: () -> Unit = {},
     onHibernateAll: () -> Unit = {},
     onTransmitAll: () -> Unit = {},
+    onNetworkRestored: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val monitor = remember(context) { ConnectivityMonitor(context) }
@@ -88,7 +90,14 @@ fun DroneListScreen(
             monitor.unregister()
         }
     }
-    val isOnline by monitor.online.collectAsState()
+    val systemOnline by monitor.online.collectAsState()
+    // «Онлайн» только если система видит сеть И последний запрос к серверу не провалился из-за сети
+    val isOnline = systemOnline && state.networkReachable
+    var wasSystemOnline by remember { mutableStateOf(systemOnline) }
+    LaunchedEffect(systemOnline) {
+        if (systemOnline && !wasSystemOnline) onNetworkRestored()
+        wasSystemOnline = systemOnline
+    }
     val soundManager = remember { SoundManager() }
     DisposableEffect(soundManager) {
         onDispose {

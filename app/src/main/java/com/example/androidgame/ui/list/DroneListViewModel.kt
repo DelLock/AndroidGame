@@ -20,6 +20,7 @@ data class DroneListUiState(
     val lastDeletedDroneName: String? = null,
     val undoTimerSeconds: Int = 0,
     val missionNoticeMessage: String? = null,
+    val networkReachable: Boolean = true,
 )
 
 class DroneListViewModel(private val repo: DroneRepository) : ViewModel() {
@@ -62,10 +63,16 @@ class DroneListViewModel(private val repo: DroneRepository) : ViewModel() {
             undoTimerSeconds = undoTimer,
             missionNoticeMessage = missionNotice,
         )
+    }.combine(repo.networkReachableFlow) { listState, reachable ->
+        listState.copy(networkReachable = reachable)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = DroneListUiState(drones = repo.drones, credits = repo.credits)
+        initialValue = DroneListUiState(
+            drones = repo.drones,
+            credits = repo.credits,
+            networkReachable = repo.networkReachableFlow.value,
+        )
     )
 
     fun onSearchQueryChange(newQuery: String) {
@@ -89,6 +96,8 @@ class DroneListViewModel(private val repo: DroneRepository) : ViewModel() {
     fun onDismissMissionNotice() {
         repo.clearMissionNotice()
     }
+
+    fun onNetworkRestored() = repo.resetNetworkStatus()
 
     fun onHibernateAll() = repo.hibernateAll()
     fun onTransmitAll() = repo.transmitAll()

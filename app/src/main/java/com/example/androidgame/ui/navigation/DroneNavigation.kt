@@ -49,6 +49,7 @@ fun DroneNavigation(repo: DroneRepository, modifier: Modifier = Modifier) {
                     onDismissMissionNotice = viewModel::onDismissMissionNotice,
                     onHibernateAll = viewModel::onHibernateAll,
                     onTransmitAll = viewModel::onTransmitAll,
+                    onNetworkRestored = viewModel::onNetworkRestored,
                     onSelectDrone = { id ->
                         if (backStack.lastOrNull() == DroneListKey) {
                             backStack.add(DroneDetailKey(id))

@@ -143,4 +143,54 @@ class DroneRepositoryTest {
             assertEquals(20, targetAfter.temperature)
         }
     }
+
+    @Test
+    fun fetchTelemetry_returnsOnlineData_whenApiSucceeds() = kotlinx.coroutines.runBlocking {
+        val firstId = repo.drones.first().id
+        val telemetry = repo.fetchTelemetry(firstId, forceRefresh = true)
+        assertTrue(telemetry.isOnlineData)
+        assertEquals(20.0, telemetry.weather.temperature, 0.01)
+    }
+
+    @Test
+    fun fetchTelemetry_returnsCachedData_whenApiFailsAfterSuccessfulCall() = kotlinx.coroutines.runBlocking {
+        var shouldFail = false
+        val failingApi = object : OpenMeteoApi {
+            override suspend fun getWeather(latitude: Double, longitude: Double, currentWeather: Boolean): OpenMeteoResponseDto {
+                if (shouldFail) throw java.io.IOException("Network unreachable")
+                return OpenMeteoResponseDto(CurrentWeatherDto(22.5, 12.0, 0))
+            }
+        }
+        val customRepo = DroneRepository(openMeteoApi = failingApi, mainContext = Dispatchers.Default)
+        val firstId = customRepo.drones.first().id
+
+        val onlineTelemetry = customRepo.fetchTelemetry(firstId, forceRefresh = true)
+        assertTrue(onlineTelemetry.isOnlineData)
+        assertEquals(22.5, onlineTelemetry.weather.temperature, 0.01)
+
+        shouldFail = true
+        val cachedTelemetry = customRepo.fetchTelemetry(firstId, forceRefresh = true)
+        assertTrue(!cachedTelemetry.isOnlineData)
+        assertEquals(22.5, cachedTelemetry.weather.temperature, 0.01)
+        assertTrue(cachedTelemetry.notes.contains("Кэш"))
+    }
+
+    @Test
+    fun fetchTelemetry_throwsDroneNetworkException_whenNoNetworkAndNoCache() = kotlinx.coroutines.runBlocking {
+        val failingApi = object : OpenMeteoApi {
+            override suspend fun getWeather(latitude: Double, longitude: Double, currentWeather: Boolean): OpenMeteoResponseDto {
+                throw java.io.IOException("Connection refused")
+            }
+        }
+        val customRepo = DroneRepository(openMeteoApi = failingApi, mainContext = Dispatchers.Default)
+        val firstId = customRepo.drones.first().id
+
+        try {
+            customRepo.fetchTelemetry(firstId, forceRefresh = true)
+            org.junit.Assert.fail("Expected DroneNetworkException")
+        } catch (e: com.example.androidgame.data.DroneNetworkException) {
+            assertEquals(com.example.androidgame.data.NetworkErrorReason.NO_NETWORK, e.reason)
+            assertTrue(e.canRetry)
+        }
+    }
 }
