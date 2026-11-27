@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 sealed interface WeatherState {
     data object Loading : WeatherState
     data class Loaded(val telemetry: DroneTelemetry) : WeatherState
-    data class Cached(val telemetry: DroneTelemetry, val reason: String) : WeatherState
+    data class Cached(val telemetry: DroneTelemetry, val reason: String, val canRetry: Boolean = true) : WeatherState
     data class Failed(val message: String, val canRetry: Boolean) : WeatherState
 }
 
@@ -67,17 +67,38 @@ class DroneDetailViewModel(
                 }
             }
         }
+
+        viewModelScope.launch {
+            repo.networkReachableFlow.collect { reachable ->
+                if (reachable) {
+                    retryCount = 0
+                    val current = uiState
+                    if (current is DroneDetailUiState.Content) {
+                        when (val ws = current.weatherState) {
+                            is WeatherState.Cached -> if (!ws.canRetry) updateWeatherState(ws.copy(canRetry = true))
+                            is WeatherState.Failed -> if (!ws.canRetry) updateWeatherState(ws.copy(canRetry = true))
+                            else -> {}
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fun onRefreshWeather() {
         if (weatherJob?.isActive == true) return
         if (retryCount >= 3) {
-            updateWeatherState(
-                WeatherState.Failed(
-                    message = "Превышен лимит попыток подключения.",
-                    canRetry = false,
+            val current = uiState
+            if (current is DroneDetailUiState.Content && current.weatherState is WeatherState.Cached) {
+                updateWeatherState(current.weatherState.copy(reason = "Лимит повторов превышен", canRetry = false))
+            } else {
+                updateWeatherState(
+                    WeatherState.Failed(
+                        message = "Превышен лимит попыток подключения.",
+                        canRetry = false,
+                    )
                 )
-            )
+            }
             return
         }
         retryCount++
@@ -89,6 +110,8 @@ class DroneDetailViewModel(
     }
 
     fun onSetBase(baseCity: String) {
+        val drone = repo.drone(droneId) ?: return
+        if (drone.status == Drone.Status.ON_MISSION) return
         repo.setDroneBase(droneId, baseCity)
         retryCount = 0
         weatherJob?.cancel()
@@ -137,6 +160,8 @@ class DroneDetailViewModel(
             val droneAtStart = repo.drone(droneId) ?: return@launch
             val requestedCity = droneAtStart.baseCity
 
+            val previousCached = (uiState as? DroneDetailUiState.Content)?.weatherState as? WeatherState.Cached
+
             updateWeatherState(WeatherState.Loading)
 
             try {
@@ -160,12 +185,21 @@ class DroneDetailViewModel(
                 if (currentDrone.baseCity != requestedCity) return@launch
 
                 val limitReached = retryCount >= 3
-                updateWeatherState(
-                    WeatherState.Failed(
-                        message = if (limitReached) "Превышен лимит попыток подключения." else e.reason.userMessage,
-                        canRetry = e.canRetry && !limitReached,
+                if (limitReached && previousCached != null) {
+                    updateWeatherState(
+                        previousCached.copy(
+                            reason = "Превышен лимит попыток подключения.",
+                            canRetry = false,
+                        )
                     )
-                )
+                } else {
+                    updateWeatherState(
+                        WeatherState.Failed(
+                            message = if (limitReached) "Превышен лимит попыток подключения." else e.reason.userMessage,
+                            canRetry = e.canRetry && !limitReached,
+                        )
+                    )
+                }
             }
         }
     }

@@ -347,14 +347,18 @@ private fun ContentBox(
             ) {
                 items(ALL_BASES) { b ->
                     val isSelected = b.city.equals(drone.baseCity, ignoreCase = true)
+                    val isOnMission = drone.status == Drone.Status.ON_MISSION
                     Button(
                         onClick = {
                             soundManager.play(SoundManager.Effect.CLICK)
                             onSetBase(b.city)
                         },
+                        enabled = !isOnMission,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (isSelected) DroneColors.Cyan else DroneColors.SurfaceAlt,
                             contentColor = if (isSelected) Color(0xFF0B0F14) else DroneColors.TextPrimary,
+                            disabledContainerColor = if (isSelected) DroneColors.CyanDark else DroneColors.SurfaceAlt,
+                            disabledContentColor = DroneColors.Muted,
                         ),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
@@ -362,6 +366,14 @@ private fun ContentBox(
                         Text(b.city, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
+            }
+            if (drone.status == Drone.Status.ON_MISSION) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "⚠️ Смена базы заблокирована на время выполнения полёта.",
+                    fontSize = 11.sp,
+                    color = DroneColors.Warning,
+                )
             }
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -429,16 +441,18 @@ private fun ContentBox(
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                         )
                                     }
-                                    OutlinedButton(
-                                        onClick = {
-                                            soundManager.play(SoundManager.Effect.CLICK)
-                                            onRefreshWeather()
-                                        },
-                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Cyan),
-                                        shape = RoundedCornerShape(8.dp),
-                                    ) {
-                                        Text("Обновить", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    if (weatherState.canRetry) {
+                                        OutlinedButton(
+                                            onClick = {
+                                                soundManager.play(SoundManager.Effect.CLICK)
+                                                onRefreshWeather()
+                                            },
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = DroneColors.Cyan),
+                                            shape = RoundedCornerShape(8.dp),
+                                        ) {
+                                            Text("Обновить", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }

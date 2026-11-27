@@ -263,6 +263,17 @@ class DroneRepository(
                 canRetry = false,
                 cause = e,
             )
+        } catch (e: Exception) {
+            Log.e("DroneRepository", "Неожиданная ошибка при получении телеметрии для дрона $id", e)
+            val cached = cityWeatherCache[base.city]
+            if (cached != null) {
+                return buildCachedTelemetry(target, base, cached, "Системная ошибка.")
+            }
+            throw DroneNetworkException(
+                reason = NetworkErrorReason.OTHER,
+                canRetry = true,
+                cause = e,
+            )
         }
     }
 
