@@ -461,7 +461,7 @@ private fun ContentBox(
                                         color = DroneColors.DangerDark,
                                     ) {
                                         Text(
-                                            text = "Лимит превышен",
+                                            text = "Не загружено",
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = DroneColors.Danger,
@@ -515,7 +515,7 @@ private fun ContentBox(
                         is WeatherState.Failed -> {
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(weatherState.message, color = DroneColors.Danger, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Сеть недоступна, кэш отсутствует. Дрон остаётся полностью управляемым.", color = DroneColors.Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                            Text("Сохранённых данных нет. Дрон остаётся полностью управляемым.", color = DroneColors.Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
                         }
                     }
                 }

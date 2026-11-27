@@ -18,6 +18,7 @@ import com.example.androidgame.domain.model.startDrones
 import com.example.androidgame.util.retryIO
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -159,7 +160,7 @@ class DroneRepository(
             return existingJob.await()
         }
 
-        val deferred = scope.async {
+        val deferred = scope.async(start = CoroutineStart.LAZY) {
             try {
                 val response = retryIO { openMeteoApi.getWeather(base.latitude, base.longitude) }
                 val dto = response.currentWeather
@@ -172,6 +173,7 @@ class DroneRepository(
         }
 
         inFlight[base.city] = deferred
+        deferred.start()
         return deferred.await()
     }
 
@@ -497,8 +499,8 @@ class DroneRepository(
         }
         if (stateChanged) {
             _drones.value = updatedDrones
-            val hasJustFinished = forcePersist || updatedDrones.any { it.activeMissionRemaining % 5 == 0 }
-            if (hasJustFinished) {
+            val periodicSave = updatedDrones.any { it.activeMissionRemaining > 0 && it.activeMissionRemaining % 5 == 0 }
+            if (forcePersist || periodicSave) {
                 persistState()
             }
         }

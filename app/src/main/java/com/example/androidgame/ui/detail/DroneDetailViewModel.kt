@@ -144,7 +144,7 @@ class DroneDetailViewModel(
                 val currentDrone = repo.drone(droneId) ?: return@launch
                 if (currentDrone.baseCity != requestedCity) return@launch
 
-                retryCount = 0
+                if (telemetry.isOnlineData) retryCount = 0
                 val newWeatherState = if (telemetry.isOnlineData) {
                     WeatherState.Loaded(telemetry)
                 } else {
@@ -159,10 +159,11 @@ class DroneDetailViewModel(
                 val currentDrone = repo.drone(droneId) ?: return@launch
                 if (currentDrone.baseCity != requestedCity) return@launch
 
+                val limitReached = retryCount >= 3
                 updateWeatherState(
                     WeatherState.Failed(
-                        message = e.reason.userMessage,
-                        canRetry = e.canRetry && retryCount < 3,
+                        message = if (limitReached) "Превышен лимит попыток подключения." else e.reason.userMessage,
+                        canRetry = e.canRetry && !limitReached,
                     )
                 )
             }
