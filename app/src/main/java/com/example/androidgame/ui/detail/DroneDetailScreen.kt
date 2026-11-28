@@ -525,6 +525,9 @@ private fun ContentBox(
                             Text("Дальность: ${telemetry.rangeKm} км", color = DroneColors.TextPrimary, fontSize = 12.sp)
                             Text("Сенсоры: ${telemetry.sensorType}", color = DroneColors.TextPrimary, fontSize = 12.sp)
                             Text(telemetry.notes, color = DroneColors.Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                            if (!weatherState.canRetry) {
+                                Text(weatherState.reason, color = DroneColors.Warning, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
                         }
                         is WeatherState.Failed -> {
                             Spacer(modifier = Modifier.height(4.dp))

@@ -1,8 +1,6 @@
 package com.example.androidgame.ui.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
@@ -38,7 +36,7 @@ fun DroneNavigation(repo: DroneRepository, modifier: Modifier = Modifier) {
         entryProvider = entryProvider {
             entry<DroneListKey> {
                 val viewModel = viewModel { DroneListViewModel(repo) }
-                val state by viewModel.uiState.collectAsState()
+                val state = viewModel.uiState
                 DroneListScreen(
                     state = state,
                     onSearchQueryChange = viewModel::onSearchQueryChange,
@@ -49,7 +47,6 @@ fun DroneNavigation(repo: DroneRepository, modifier: Modifier = Modifier) {
                     onDismissMissionNotice = viewModel::onDismissMissionNotice,
                     onHibernateAll = viewModel::onHibernateAll,
                     onTransmitAll = viewModel::onTransmitAll,
-                    onNetworkRestored = viewModel::onNetworkRestored,
                     onSelectDrone = { id ->
                         if (backStack.lastOrNull() == DroneListKey) {
                             backStack.add(DroneDetailKey(id))

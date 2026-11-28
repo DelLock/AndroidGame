@@ -11,4 +11,6 @@ data class DroneTelemetry(
     val weather: Weather,
     val notes: String,
     val isOnlineData: Boolean,
+    val canRetry: Boolean = true,
+    val isExpired: Boolean = false,
 )

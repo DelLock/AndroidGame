@@ -31,4 +31,16 @@ object DroneGameEngine {
         30 -> 35
         else -> 20
     }
+
+    fun formatMissionNotice(droneName: String, reward: Int, cargoGain: Int, queueCount: Int, totalReward: Int): String {
+        return if (queueCount <= 1) {
+            "Дрон '$droneName' успешно вернулся с вылета! (+$reward⚡, +$cargoGain% памяти)"
+        } else {
+            "Дрон '$droneName' вернулся! (+$reward⚡, еще +${queueCount - 1} в очереди, всего +$totalReward⚡)"
+        }
+    }
+
+    fun formatStormNotice(droneName: String): String {
+        return "⚠️ Дрон '$droneName' попал в шторм и был сбит! Данные утеряны, системы перегреты."
+    }
 }

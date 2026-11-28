@@ -1,6 +1,7 @@
 package com.example.androidgame.ui.detail
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -10,7 +11,6 @@ import com.example.androidgame.data.DroneNotFoundException
 import com.example.androidgame.data.DroneRepository
 import com.example.androidgame.domain.model.Drone
 import com.example.androidgame.domain.model.DroneTelemetry
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -35,73 +35,29 @@ class DroneDetailViewModel(
     private val repo: DroneRepository,
 ) : ViewModel() {
 
-    var uiState: DroneDetailUiState by mutableStateOf(initialState())
-        private set
-
+    private var weather: WeatherState by mutableStateOf(WeatherState.Loading)
+    private var retryCount by mutableIntStateOf(0)
+    private var seenRestoreCount by mutableIntStateOf(repo.networkRestoreCount)
     private var weatherJob: Job? = null
-    private var retryCount = 0
+
+    // После возвращения сети старые попытки не считаются.
+    private val usedRetries: Int
+        get() = if (seenRestoreCount == repo.networkRestoreCount) retryCount else 0
+
+    val uiState: DroneDetailUiState
+        get() {
+            val drone = repo.drone(droneId) ?: return DroneDetailUiState.NotFound
+            return DroneDetailUiState.Content(drone, applyRetryLimit(weather), repo.credits)
+        }
 
     init {
-        val initialDrone = repo.drone(droneId)
-        if (initialDrone != null) {
-            loadWeather(forceNetwork = false)
-        }
-
-        viewModelScope.launch {
-            repo.dronesFlow.collect { drones ->
-                val updatedDrone = drones.find { it.id == droneId }
-                val current = uiState
-                if (updatedDrone == null) {
-                    uiState = DroneDetailUiState.NotFound
-                } else if (current is DroneDetailUiState.Content) {
-                    uiState = current.copy(drone = updatedDrone)
-                }
-            }
-        }
-
-        viewModelScope.launch {
-            repo.creditsFlow.collect { credits ->
-                val current = uiState
-                if (current is DroneDetailUiState.Content) {
-                    uiState = current.copy(credits = credits)
-                }
-            }
-        }
-
-        viewModelScope.launch {
-            repo.networkReachableFlow.collect { reachable ->
-                if (reachable) {
-                    retryCount = 0
-                    val current = uiState
-                    if (current is DroneDetailUiState.Content) {
-                        when (val ws = current.weatherState) {
-                            is WeatherState.Cached -> if (!ws.canRetry) updateWeatherState(ws.copy(canRetry = true))
-                            is WeatherState.Failed -> if (!ws.canRetry) updateWeatherState(ws.copy(canRetry = true))
-                            else -> {}
-                        }
-                    }
-                }
-            }
-        }
+        loadWeather(forceNetwork = false)
     }
 
     fun onRefreshWeather() {
-        if (weatherJob?.isActive == true) return
-        if (retryCount >= 3) {
-            val current = uiState
-            if (current is DroneDetailUiState.Content && current.weatherState is WeatherState.Cached) {
-                updateWeatherState(current.weatherState.copy(reason = "Лимит повторов превышен", canRetry = false))
-            } else {
-                updateWeatherState(
-                    WeatherState.Failed(
-                        message = "Превышен лимит попыток подключения.",
-                        canRetry = false,
-                    )
-                )
-            }
-            return
-        }
-        retryCount++
+        if (weatherJob?.isActive == true || usedRetries >= MAX_MANUAL_RETRIES) return
+        retryCount = usedRetries + 1
+        seenRestoreCount = repo.networkRestoreCount
         loadWeather(forceNetwork = true)
     }
 
@@ -122,7 +78,7 @@ class DroneDetailViewModel(
         val content = uiState as? DroneDetailUiState.Content
         val isWindy = when (val ws = content?.weatherState) {
             is WeatherState.Loaded -> ws.telemetry.weather.isWindy
-            is WeatherState.Cached -> ws.telemetry.weather.isWindy
+            is WeatherState.Cached -> !ws.telemetry.isExpired && ws.telemetry.weather.isWindy
             else -> false
         }
         repo.collectData(droneId, isWindy)
@@ -146,68 +102,43 @@ class DroneDetailViewModel(
 
     fun onDelete() = repo.deleteDrone(droneId)
 
-    private fun initialState(): DroneDetailUiState {
-        val drone = repo.drone(droneId) ?: return DroneDetailUiState.NotFound
-        return DroneDetailUiState.Content(
-            drone = drone,
-            weatherState = WeatherState.Loading,
-            credits = repo.credits,
-        )
-    }
-
     private fun loadWeather(forceNetwork: Boolean) {
+        if (repo.drone(droneId) == null) return
+        weather = WeatherState.Loading
         weatherJob = viewModelScope.launch {
-            val droneAtStart = repo.drone(droneId) ?: return@launch
-            val requestedCity = droneAtStart.baseCity
-
-            val previousCached = (uiState as? DroneDetailUiState.Content)?.weatherState as? WeatherState.Cached
-
-            updateWeatherState(WeatherState.Loading)
-
             try {
                 val telemetry = repo.fetchTelemetry(droneId, forceRefresh = forceNetwork)
-                val currentDrone = repo.drone(droneId) ?: return@launch
-                if (currentDrone.baseCity != requestedCity) return@launch
-
-                if (telemetry.isOnlineData) retryCount = 0
-                val newWeatherState = if (telemetry.isOnlineData) {
+                weather = if (telemetry.isOnlineData) {
+                    retryCount = 0
                     WeatherState.Loaded(telemetry)
                 } else {
-                    WeatherState.Cached(telemetry, reason = "Загружено из кэша")
+                    WeatherState.Cached(
+                        telemetry = telemetry,
+                        reason = if (telemetry.canRetry) "Загружено из кэша" else "Повторный запрос не поможет",
+                        canRetry = telemetry.canRetry,
+                    )
                 }
-                updateWeatherState(newWeatherState)
-            } catch (e: CancellationException) {
-                throw e
             } catch (e: DroneNotFoundException) {
-                uiState = DroneDetailUiState.NotFound
+                // Дрон удалён: uiState сам вернёт NotFound.
             } catch (e: DroneNetworkException) {
-                val currentDrone = repo.drone(droneId) ?: return@launch
-                if (currentDrone.baseCity != requestedCity) return@launch
-
-                val limitReached = retryCount >= 3
-                if (limitReached && previousCached != null) {
-                    updateWeatherState(
-                        previousCached.copy(
-                            reason = "Превышен лимит попыток подключения.",
-                            canRetry = false,
-                        )
-                    )
-                } else {
-                    updateWeatherState(
-                        WeatherState.Failed(
-                            message = if (limitReached) "Превышен лимит попыток подключения." else e.reason.userMessage,
-                            canRetry = e.canRetry && !limitReached,
-                        )
-                    )
-                }
+                weather = WeatherState.Failed(e.reason.userMessage, e.canRetry)
             }
         }
     }
 
-    private fun updateWeatherState(newWeatherState: WeatherState) {
-        val current = uiState
-        if (current is DroneDetailUiState.Content) {
-            uiState = current.copy(weatherState = newWeatherState)
+    private fun applyRetryLimit(state: WeatherState): WeatherState {
+        if (usedRetries < MAX_MANUAL_RETRIES) return state
+        return when (state) {
+            is WeatherState.Cached -> state.copy(canRetry = false, reason = "Лимит повторов исчерпан")
+            is WeatherState.Failed -> state.copy(
+                canRetry = false,
+                message = "${state.message}. Лимит повторов исчерпан",
+            )
+            else -> state
         }
+    }
+
+    private companion object {
+        const val MAX_MANUAL_RETRIES = 3
     }
 }

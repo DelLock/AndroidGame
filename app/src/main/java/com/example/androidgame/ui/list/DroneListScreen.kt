@@ -42,8 +42,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,7 +50,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -64,7 +61,6 @@ import com.example.androidgame.ui.components.DroneColors
 import com.example.androidgame.ui.components.DroneImage
 import com.example.androidgame.ui.components.StatusImage
 import com.example.androidgame.ui.components.style
-import com.example.androidgame.util.ConnectivityMonitor
 import com.example.androidgame.util.SoundManager
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,23 +77,8 @@ fun DroneListScreen(
     onDismissMissionNotice: () -> Unit = {},
     onHibernateAll: () -> Unit = {},
     onTransmitAll: () -> Unit = {},
-    onNetworkRestored: () -> Unit = {},
 ) {
-    val context = LocalContext.current
-    val monitor = remember(context) { ConnectivityMonitor(context) }
-    DisposableEffect(monitor) {
-        onDispose {
-            monitor.unregister()
-        }
-    }
-    val systemOnline by monitor.online.collectAsState()
-    // «Онлайн» только если система видит сеть И последний запрос к серверу не провалился из-за сети
-    val isOnline = systemOnline && state.networkReachable
-    var wasSystemOnline by remember { mutableStateOf(systemOnline) }
-    LaunchedEffect(systemOnline) {
-        if (systemOnline && !wasSystemOnline) onNetworkRestored()
-        wasSystemOnline = systemOnline
-    }
+    val isOnline = state.isOnline
     val soundManager = remember { SoundManager() }
     DisposableEffect(soundManager) {
         onDispose {

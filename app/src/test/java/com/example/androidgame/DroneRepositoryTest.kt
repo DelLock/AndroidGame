@@ -193,4 +193,12 @@ class DroneRepositoryTest {
             assertTrue(e.canRetry)
         }
     }
+
+    @Test
+    fun weatherDto_failsWhenRequiredFieldIsMissing() {
+        val withoutWind = """{"current_weather":{"temperature":1.0,"weathercode":0}}"""
+        org.junit.Assert.assertThrows(kotlinx.serialization.SerializationException::class.java) {
+            kotlinx.serialization.json.Json.decodeFromString(OpenMeteoResponseDto.serializer(), withoutWind)
+        }
+    }
 }
