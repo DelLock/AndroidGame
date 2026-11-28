@@ -1,4 +1,4 @@
-package com.example.androidgame
+package com.example.androidgame.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -9,6 +9,11 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
+import com.example.androidgame.data.DroneRepository
+import com.example.androidgame.ui.detail.DroneDetailScreen
+import com.example.androidgame.ui.detail.DroneDetailViewModel
+import com.example.androidgame.ui.list.DroneListScreen
+import com.example.androidgame.ui.list.DroneListViewModel
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -31,10 +36,17 @@ fun DroneNavigation(repo: DroneRepository, modifier: Modifier = Modifier) {
         entryProvider = entryProvider {
             entry<DroneListKey> {
                 val viewModel = viewModel { DroneListViewModel(repo) }
+                val state = viewModel.uiState
                 DroneListScreen(
-                    state = viewModel.uiState,
+                    state = state,
+                    onSearchQueryChange = viewModel::onSearchQueryChange,
+                    onFilterChange = viewModel::onFilterChange,
                     onAddDrone = viewModel::onAddDrone,
                     onDeleteDrone = viewModel::onDeleteDrone,
+                    onRestoreDeletedDrone = viewModel::onRestoreDeletedDrone,
+                    onDismissMissionNotice = viewModel::onDismissMissionNotice,
+                    onHibernateAll = viewModel::onHibernateAll,
+                    onTransmitAll = viewModel::onTransmitAll,
                     onSelectDrone = { id ->
                         if (backStack.lastOrNull() == DroneListKey) {
                             backStack.add(DroneDetailKey(id))
@@ -51,11 +63,17 @@ fun DroneNavigation(repo: DroneRepository, modifier: Modifier = Modifier) {
                 }
                 DroneDetailScreen(
                     state = viewModel.uiState,
+                    onRefreshWeather = viewModel::onRefreshWeather,
                     onRename = viewModel::onRename,
+                    onSetBase = viewModel::onSetBase,
                     onCollectData = viewModel::onCollectData,
                     onTransmitData = viewModel::onTransmitData,
                     onHibernate = viewModel::onHibernate,
                     onReset = viewModel::onReset,
+                    onStartMission = viewModel::onStartMission,
+                    onUpgradeBattery = viewModel::onUpgradeBattery,
+                    onUpgradeCargo = viewModel::onUpgradeCargo,
+                    onUpgradeCooling = viewModel::onUpgradeCooling,
                     onDelete = {
                         viewModel.onDelete()
                         close()
